@@ -1,0 +1,1642 @@
+{
+  "metadata": {
+    "source": "polymarket",
+    "startTs": 1766086222700,
+    "endTs": 1766172622700,
+    "fetchedAt": 1766172648912
+  },
+  "data": [
+    {
+      "conditionId": "0x3b0a17f11eacd47b33a825298ffb1ce53ca337cfdb38b9bf1b36af57ae31b6be",
+      "question": "Bitcoin Up or Down - December 18, 2:30PM-2:45PM ET",
+      "slug": "btc-updown-15m-1766086200",
+      "tokenIds": [
+        "88012140435680070594919520220274382923156616411863003174858884938403561853626",
+        "19263177503231100378764743454515195699741391412935020604732026534789071998876"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766086200000,
+      "endTime": 1766087100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x72314ad0a33602b4332e820b24425b3f36c1879e274135656fb5bf08d5bfaabf",
+      "question": "Bitcoin Up or Down - December 18, 2:45PM-3:00PM ET",
+      "slug": "btc-updown-15m-1766087100",
+      "tokenIds": [
+        "85492634533829462993550271720923265043369307136522062342967507867530785876291",
+        "81920307254189069809630970823066240275251892571738921131995894607927575251126"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766087100000,
+      "endTime": 1766088000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x3f35091578c732c81e908b310fb36cc147a63f56f669aa044cc53fa4abcab02d",
+      "question": "Bitcoin Up or Down - December 18, 3:00PM-3:15PM ET",
+      "slug": "btc-updown-15m-1766088000",
+      "tokenIds": [
+        "11045723693892017677350595402299302707069866343975268697230790395564153980036",
+        "21055405636208262010978048451654385648124223869173161462794353575235728352637"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766088000000,
+      "endTime": 1766088900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x090badadd744887aea3f78994f7bd6968991bd8255c004aca55bb96e10ca7e7c",
+      "question": "Bitcoin Up or Down - December 18, 3:15PM-3:30PM ET",
+      "slug": "btc-updown-15m-1766088900",
+      "tokenIds": [
+        "87497955572083860108245897005211411468620806592559382120267344868893967738193",
+        "22232673182643760693795706311654004374781986423862362829114224424719140964314"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85108.3342915,
+      "startTime": 1766088900000,
+      "endTime": 1766089800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xb930c3c4317c77cd2c1fe756a573c04967784bde16d4822d780744ff5266f2c9",
+      "question": "Bitcoin Up or Down - December 18, 3:30PM-3:45PM ET",
+      "slug": "btc-updown-15m-1766089800",
+      "tokenIds": [
+        "40489887639452902415344692738936528791214831941160576928527876662477974717619",
+        "8267102889343927019016451255608560622636357750021616883653184484243354197394"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766089800000,
+      "endTime": 1766090700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x52ed3bffadf83c15323776908ab2d246e1e056a0f255f7d5c51e62b7b45e17ad",
+      "question": "Bitcoin Up or Down - December 18, 3:45PM-4:00PM ET",
+      "slug": "btc-updown-15m-1766090700",
+      "tokenIds": [
+        "45188799371157440396468036404456770241217352399081423285462094053927931044351",
+        "97207642266282731392066330195884700972926530253264989646000373220920553718531"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 84967.73193838917,
+      "startTime": 1766090700000,
+      "endTime": 1766091600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xf75777f7d5d6c29e1988e2c9496fab835a6291f09c73e1ade7ca42bcf854b248",
+      "question": "Bitcoin Up or Down - December 18, 4:00PM-4:15PM ET",
+      "slug": "btc-updown-15m-1766091600",
+      "tokenIds": [
+        "83172667182656651685376939928737997369469742339551610522329359982482891590744",
+        "4658268093427264317751676887087965601866460008320224622362666187586039397280"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766091600000,
+      "endTime": 1766092500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x50484e3fd2f10f19fe193de0e641139287f80b8d4f926326d7ef0c61bd5d365c",
+      "question": "Bitcoin Up or Down - December 18, 4:15PM-4:30PM ET",
+      "slug": "btc-updown-15m-1766092500",
+      "tokenIds": [
+        "61808068410887278999617883750540212725951143331225959035035962806933872692073",
+        "53625318335954376776880907751633690183129307611171057910110775345793168451383"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85118.51422624153,
+      "startTime": 1766092500000,
+      "endTime": 1766093400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x8da591c9e87610bf52b2a8b1b52aaf6e79a0e96c5142954663a7f64de5fcb6be",
+      "question": "Bitcoin Up or Down - December 18, 4:30PM-4:45PM ET",
+      "slug": "btc-updown-15m-1766093400",
+      "tokenIds": [
+        "100867454698799893834743951323216687223667633335433345365959078848066377254744",
+        "86973658426700910728103052720895253203441914319982466728219379775034679458143"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85411.97483987299,
+      "startTime": 1766093400000,
+      "endTime": 1766094300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x019400f040552ecdae36c64423e888b04a0fb9148c6a3b93a4a7b286b420150c",
+      "question": "Bitcoin Up or Down - December 18, 4:45PM-5:00PM ET",
+      "slug": "btc-updown-15m-1766094300",
+      "tokenIds": [
+        "46951942098456448976907806366896777608891921955201356028598220915791085742188",
+        "43622457830234943641687891821626944652249708461238269664635707578552426861955"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85249.3870562254,
+      "startTime": 1766094300000,
+      "endTime": 1766095200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xb38fe10dcfe144e0167c2592cd0730c2a4d8174ccb286b1ccf376174613aec78",
+      "question": "Bitcoin Up or Down - December 18, 5:00PM-5:15PM ET",
+      "slug": "btc-updown-15m-1766095200",
+      "tokenIds": [
+        "88588479779244628618628755071494465817374406000211593913169560116801771275774",
+        "56864989482359454393261060132721297210271106017917943390813738873892038755575"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766095200000,
+      "endTime": 1766096100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x88f999056e9fdc21dfc2919ee9117552857ed463c15a77fdd6b0f22be3327737",
+      "question": "Bitcoin Up or Down - December 18, 5:15PM-5:30PM ET",
+      "slug": "btc-updown-15m-1766096100",
+      "tokenIds": [
+        "39324117116626108570227794310915750001852043337231617928275237999939139112548",
+        "102521710113337440948640204065760507892527688837746977821196855253001686435841"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85335.43551964675,
+      "startTime": 1766096100000,
+      "endTime": 1766097000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x9430688c7e58902b35252adb8baddf572017c50b3743f67006102980f93b881b",
+      "question": "Bitcoin Up or Down - December 18, 5:30PM-5:45PM ET",
+      "slug": "btc-updown-15m-1766097000",
+      "tokenIds": [
+        "4705724463853179441738858034274478526300155481671251747847797299894107265306",
+        "112622268062269663086591117406670397864396337571049060720344784210764301201650"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85452.86896830681,
+      "startTime": 1766097000000,
+      "endTime": 1766097900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x5c36f59d12a68e0023a305f8568ca903fac32f2df38954b4eb1d0e0bc2fe2637",
+      "question": "Bitcoin Up or Down - December 18, 5:45PM-6:00PM ET",
+      "slug": "btc-updown-15m-1766097900",
+      "tokenIds": [
+        "3435898813948111941359201816367642054464970804816730963121615231801432505546",
+        "3292585446103569214190217221281083712104096380913008905804492500969038347023"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766097900000,
+      "endTime": 1766098800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x2ab2912c3349277ca91820398c98a15fca413e7664c46c187f7189e8f356f85f",
+      "question": "Bitcoin Up or Down - December 18, 6:00PM-6:15PM ET",
+      "slug": "btc-updown-15m-1766098800",
+      "tokenIds": [
+        "112731808153266362895587469443822012998341918946708491320280837741225272551029",
+        "11998684635294350472830383845428560190533865160088511458728105876022725891212"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766098800000,
+      "endTime": 1766099700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x95a900e19324613f9c58c5c53f615c51db373fb950e01e9481927e03a2d48a68",
+      "question": "Bitcoin Up or Down - December 18, 6:15PM-6:30PM ET",
+      "slug": "btc-updown-15m-1766099700",
+      "tokenIds": [
+        "71932202182897021896189618154809671438477241069761441938819793380416774312713",
+        "109136360385063860008229670976476157146071602728729942452827160169833575330027"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85572.84507592875,
+      "startTime": 1766099700000,
+      "endTime": 1766100600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xbb292d501af9add376055ef1ecd9205b990ec2e94907e43091a5a91267f1806f",
+      "question": "Bitcoin Up or Down - December 18, 6:30PM-6:45PM ET",
+      "slug": "btc-updown-15m-1766100600",
+      "tokenIds": [
+        "85684927475269346944365640746406839689280149726143030183773813843361070968240",
+        "1560982995842528147133519042969613293269556681607267708675882323427746317674"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766100600000,
+      "endTime": 1766101500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x045ce0cf904867da0d9387e3ce619e9d93f9a31d4a78d5ed7944e7dc8c4682c9",
+      "question": "Bitcoin Up or Down - December 18, 6:45PM-7:00PM ET",
+      "slug": "btc-updown-15m-1766101500",
+      "tokenIds": [
+        "71217878817552525713543719622063440060142564196105309837419368930527340646402",
+        "62601682539014674629585396540217735295378407203193753442341642431684083766455"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85432.722055,
+      "startTime": 1766101500000,
+      "endTime": 1766102400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x84248082e51462b398c6dc4b2f29744021341abd294512c70d890ce82a81367b",
+      "question": "Bitcoin Up or Down - December 18, 7:00PM-7:15PM ET",
+      "slug": "btc-updown-15m-1766102400",
+      "tokenIds": [
+        "93160631611530355485444359714096354716107402454649722171765299950239632387615",
+        "80730225873768128007114321987644918162701168411903612324372914950211607582642"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766102400000,
+      "endTime": 1766103300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x143fe2634280b0deea66116027ce888e78f41c37f88775bb50a4d260b1506aae",
+      "question": "Bitcoin Up or Down - December 18, 7:15PM-7:30PM ET",
+      "slug": "btc-updown-15m-1766103300",
+      "tokenIds": [
+        "15265009779726423470437446547601379332575406446227459023724212913760115214194",
+        "80658337888527275126838653205140940548976964443636086814848360240410968988009"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85444.7383482159,
+      "startTime": 1766103300000,
+      "endTime": 1766104200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xb8eb698406edd0d29fc35bb02fcb15f5a826a3837702a2ce26cc6178464cfb6f",
+      "question": "Bitcoin Up or Down - December 18, 7:30PM-7:45PM ET",
+      "slug": "btc-updown-15m-1766104200",
+      "tokenIds": [
+        "88975755897065449590342517145582466078810610123319933893968445241727584004227",
+        "27186100581564924901921087044298802742463852204614645672045631063677356041917"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85372.34873549316,
+      "startTime": 1766104200000,
+      "endTime": 1766105100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x81912f496f98d6145ae13058366dc9d2ae220c2895240c7f7f396787cf8c2279",
+      "question": "Bitcoin Up or Down - December 18, 7:45PM-8:00PM ET",
+      "slug": "btc-updown-15m-1766105100",
+      "tokenIds": [
+        "38329448313583952935532759246444413543696543248332757049691701361928314232091",
+        "107584528155343805344958747775077628297490370839843954978008654257571721544890"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766105100000,
+      "endTime": 1766106000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x335f4d54a7a65a2767e6823b5ec86ae48f1cb44cbd6d80262dd070dc45ce3746",
+      "question": "Bitcoin Up or Down - December 18, 8:00PM-8:15PM ET",
+      "slug": "btc-updown-15m-1766106000",
+      "tokenIds": [
+        "23699191580988235755314706333481830656791782213575185479270126528176389915308",
+        "67384519749592165443622314004203900626377182674906596008176335425714080807833"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766106000000,
+      "endTime": 1766106900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xd3bf5512fb76aec47969b966b579d61c17f5b3f7f71642ad30893b3a54eaee03",
+      "question": "Bitcoin Up or Down - December 18, 8:15PM-8:30PM ET",
+      "slug": "btc-updown-15m-1766106900",
+      "tokenIds": [
+        "51262730164970770164122640663712369514127369208555837208028203488024585481630",
+        "13397354953052222306270302870822651471444815333603170658287813553645845150768"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766106900000,
+      "endTime": 1766107800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x59c24aa70599aacf86727e2e4443f4114072779d4c40c1ae344fc8f0423fc0ae",
+      "question": "Bitcoin Up or Down - December 18, 8:30PM-8:45PM ET",
+      "slug": "btc-updown-15m-1766107800",
+      "tokenIds": [
+        "37134907684480542133376111346352948052794430541985475566685499908326501727744",
+        "48972241401578383677513763958579161277278428191963580149200768107880078541774"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766107800000,
+      "endTime": 1766108700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x2d62107b52fe71cf99eae5fe3d3f1bb482a0513b5f2de8af4f81c49760687594",
+      "question": "Bitcoin Up or Down - December 18, 8:45PM-9:00PM ET",
+      "slug": "btc-updown-15m-1766108700",
+      "tokenIds": [
+        "30255145042336857729374410039066028924048147919245859504508090271211693692557",
+        "82228796828180826315958463288063894929590305683128449580464645583821483322937"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85288.58640472806,
+      "startTime": 1766108700000,
+      "endTime": 1766109600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x41a5ce73ab319990d95fdeb5978b5c58d1312acd33ccfe8bd8c90f42e7cecb2f",
+      "question": "Bitcoin Up or Down - December 18, 9:00PM-9:15PM ET",
+      "slug": "btc-updown-15m-1766109600",
+      "tokenIds": [
+        "15953786748017577661344487487553967548285572830046116611853078759053585298580",
+        "67239908444779930342280750712166001107141353495636705967403404167472327700121"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85279.76273107895,
+      "startTime": 1766109600000,
+      "endTime": 1766110500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xa4f3a3902a24a5b9f6dcf1e7e2e13f63ba4a88c4565ff606671281cc986e8870",
+      "question": "Bitcoin Up or Down - December 18, 9:15PM-9:30PM ET",
+      "slug": "btc-updown-15m-1766110500",
+      "tokenIds": [
+        "67713774070495066067716723561474591163763650034761443677456947392661609269351",
+        "7683711047096190602129092417037460630911956928752596956180589162943206139293"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766110500000,
+      "endTime": 1766111400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xcfc42653a68f30022a46c918d26681e6ff6641e58177ab000180a2998a7adf55",
+      "question": "Bitcoin Up or Down - December 18, 9:30PM-9:45PM ET",
+      "slug": "btc-updown-15m-1766111400",
+      "tokenIds": [
+        "76887228975995225595680305443457812298857922806518835869282859923774893149200",
+        "12249472267789312858299227787365531788644530113701768519465989752658325556057"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85471.76262597553,
+      "startTime": 1766111400000,
+      "endTime": 1766112300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x19c9955398d1d4f83398a2da1ca46c48743774246677c3d56dbafe0237cc8b57",
+      "question": "Bitcoin Up or Down - December 18, 9:45PM-10:00PM ET",
+      "slug": "btc-updown-15m-1766112300",
+      "tokenIds": [
+        "4567408230962347783858410084228554684669075896470776923047409015847531390439",
+        "20395101833329086458706903064261278624141778711887320653866070380068640752517"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766112300000,
+      "endTime": 1766113200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xa37b979447eb9b908e0a5ffecadc8b99da56c90bcdd3d77ed4979c98dc9d529c",
+      "question": "Bitcoin Up or Down - December 18, 10:00PM-10:15PM ET",
+      "slug": "btc-updown-15m-1766113200",
+      "tokenIds": [
+        "5750638769644013034419401723307665216506097792392958111684121375882340109636",
+        "60217778198633800586466811680945381166766332114372520648430058933453507914573"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 85595.78403582709,
+      "startTime": 1766113200000,
+      "endTime": 1766114100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe1e6cf9882fb31ce39bd08acfd8c339cf75d1b45e891704eadb5209bdd37b31f",
+      "question": "Bitcoin Up or Down - December 18, 10:15PM-10:30PM ET",
+      "slug": "btc-updown-15m-1766114100",
+      "tokenIds": [
+        "70055705641606067346333811356623729108756344103485016834282346861517277994441",
+        "79402182065005600669778497763272785895898345460650841074159309191335289381472"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86311.51010923857,
+      "startTime": 1766114100000,
+      "endTime": 1766115000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xf4b2a8d3588f0e5c638576a63374cac1f8cea668931b2d5c380404eb41a180c6",
+      "question": "Bitcoin Up or Down - December 18, 10:30PM-10:45PM ET",
+      "slug": "btc-updown-15m-1766115000",
+      "tokenIds": [
+        "12927505717641111927588246320415418858959705822326329451378459730409607922826",
+        "50254751254061133064746332255739198713817976394652838333591156045352443524457"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87075.35311987669,
+      "startTime": 1766115000000,
+      "endTime": 1766115900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x06fdc11c0844b67ad6ae7af4be644c0ebfcd82742acf27e5a8ddc908d788cee3",
+      "question": "Bitcoin Up or Down - December 18, 10:45PM-11:00PM ET",
+      "slug": "btc-updown-15m-1766115900",
+      "tokenIds": [
+        "4179601310319173933102366398134773973192453530086961819875468406220834417555",
+        "80821737575694920637966214121463084834896338862402976962948237669998005378454"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766115900000,
+      "endTime": 1766116800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x5db4c0541d06223b5951e11a135fae2bb44475920e35d48c5a22f583777ef852",
+      "question": "Bitcoin Up or Down - December 18, 11:00PM-11:15PM ET",
+      "slug": "btc-updown-15m-1766116800",
+      "tokenIds": [
+        "92998329170053852436538132100582723816056571707220159734200465220464454070333",
+        "52688310766422232715242756864274233634171512580086449287865941637015615194787"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766116800000,
+      "endTime": 1766117700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x46a6c9cbc83418ccbe2c0f49f3cc76e246bbc5407e702c1b5cd23b0010060fb6",
+      "question": "Bitcoin Up or Down - December 18, 11:15PM-11:30PM ET",
+      "slug": "btc-updown-15m-1766117700",
+      "tokenIds": [
+        "17819266377674445253996910815599979986678863455131834098243882169595233927785",
+        "101756145411096486416276615064507735928809579415746045468091805156361136690100"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766117700000,
+      "endTime": 1766118600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xf00e5f6a2fff0088653189235a01e81cf796ec2a4bea28edadf5a661d3ea9a57",
+      "question": "Bitcoin Up or Down - December 18, 11:30PM-11:45PM ET",
+      "slug": "btc-updown-15m-1766118600",
+      "tokenIds": [
+        "50906176964078922906862709535131548716276842425682467844349359193719342980169",
+        "101699118182760246762851747026062813098021932838631549757151546921374370772233"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86986.20986457587,
+      "startTime": 1766118600000,
+      "endTime": 1766119500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x10b82053a3170ba75c2017e3bb56ec877cbf1734b17b83e0210e1a57743cca7b",
+      "question": "Bitcoin Up or Down - December 18, 11:45PM-12:00AM ET",
+      "slug": "btc-updown-15m-1766119500",
+      "tokenIds": [
+        "58464841948869777368394647122343471375527505307457516143666961348310360265414",
+        "33308577715117601875486574558237185316117136070689040773030848754571112285022"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86920.9663592948,
+      "startTime": 1766119500000,
+      "endTime": 1766120400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x9b8caab83324a9a164b95a1234c4bd4da7fbfc2a8754d59cd92ad16c3c0a98de",
+      "question": "Bitcoin Up or Down - December 19, 12:00AM-12:15AM ET",
+      "slug": "btc-updown-15m-1766120400",
+      "tokenIds": [
+        "35826064241128389321373392460438740573974895662409683798989877764905267985295",
+        "106413711262047285369278339302542121092008174930213319500738660480978330974458"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87041.0856275,
+      "startTime": 1766120400000,
+      "endTime": 1766121300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x4c0b5520b9fb4fea8dab698bc098860c949817a9c8eebd93bda51013422ab27a",
+      "question": "Bitcoin Up or Down - December 19, 12:15AM-12:30AM ET",
+      "slug": "btc-updown-15m-1766121300",
+      "tokenIds": [
+        "186121314561635106938881388502303024363537119654705741519214639176841119308",
+        "114597518056866499317347222741159498093023230842433657719440419130731538275513"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86935.01003324002,
+      "startTime": 1766121300000,
+      "endTime": 1766122200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x005a66bbd7915993de3a10ba6394b84e09619246bc26d8cc89eb18c3a62cdca3",
+      "question": "Bitcoin Up or Down - December 19, 12:30AM-12:45AM ET",
+      "slug": "btc-updown-15m-1766122200",
+      "tokenIds": [
+        "11172968130914376015465529051348882225989402410096313539429129558916840341386",
+        "61179060963689740937829062291084086179379564415448785911818185968042064692971"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86709.6133282926,
+      "startTime": 1766122200000,
+      "endTime": 1766123100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x401f0d555af4efe2150abd7b494b6848ca4acdabb15241a51a5986d502813644",
+      "question": "Bitcoin Up or Down - December 19, 12:45AM-1:00AM ET",
+      "slug": "btc-updown-15m-1766123100",
+      "tokenIds": [
+        "73892074525493764313577408077172141350239847829619183129209240140317685527657",
+        "13494542339250399280371777008224822668665924578349053552980564259137588332973"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86838.19853056717,
+      "startTime": 1766123100000,
+      "endTime": 1766124000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xee3e617af42a0480f61fa51f9526ade811f66b6b4ee1aa971ca80e660db21ce2",
+      "question": "Bitcoin Up or Down - December 19, 1:00AM-1:15AM ET",
+      "slug": "btc-updown-15m-1766124000",
+      "tokenIds": [
+        "21383825323622201805520785564455327868076475650267881220398691170735230342454",
+        "27425323092800118862110331602084235114460122698493062061749737296488024119216"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87088.5187836936,
+      "startTime": 1766124000000,
+      "endTime": 1766124900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x3c6df9c2c11e7fe0a23544aef0c280baa748cad2ec8679eb547889c38a16b4a7",
+      "question": "Bitcoin Up or Down - December 19, 1:15AM-1:30AM ET",
+      "slug": "btc-updown-15m-1766124900",
+      "tokenIds": [
+        "82390421977974021284042586525387031304226140766094279667992644277532427935666",
+        "96334100398631246134951529995757631725745354317428771039029087193860627521077"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86994.60797518055,
+      "startTime": 1766124900000,
+      "endTime": 1766125800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe28561758d0ad8b9c25ea743baab1bcefd5ea6e040b5f16b4f6aaf3acefd3967",
+      "question": "Bitcoin Up or Down - December 19, 1:30AM-1:45AM ET",
+      "slug": "btc-updown-15m-1766125800",
+      "tokenIds": [
+        "29050948365228686136409191642855601887002078231497612448199541433172893428702",
+        "73653992423715722930752653762259479199239782020657735545865211889291550893873"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86975.87955394493,
+      "startTime": 1766125800000,
+      "endTime": 1766126700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x5e6cc6d550653ddef3ad9c25ac4aabbf15a697d979cac00681e7060b883c59be",
+      "question": "Bitcoin Up or Down - December 19, 1:45AM-2:00AM ET",
+      "slug": "btc-updown-15m-1766126700",
+      "tokenIds": [
+        "5580622828574704080319790858094896079946824640150146541788483250840617386650",
+        "75209117295630296445867317202420290149204379231509159180565365664586939190962"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87081.05429539003,
+      "startTime": 1766126700000,
+      "endTime": 1766127600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x090288235386005dfab76190f7929275007374c3743d4cd34513ef317fb8869e",
+      "question": "Bitcoin Up or Down - December 19, 2:00AM-2:15AM ET",
+      "slug": "btc-updown-15m-1766127600",
+      "tokenIds": [
+        "50340632090676382555011864111984794804182856669523565801477355300162843452713",
+        "75603456431602914415876095005765508129323845799131486482581346109829595637779"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766127600000,
+      "endTime": 1766128500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x22eb3821ccbdfb875636995b19d889ba9d2f1cb0ae0fb435b0556cb64a86ba20",
+      "question": "Bitcoin Up or Down - December 19, 2:15AM-2:30AM ET",
+      "slug": "btc-updown-15m-1766128500",
+      "tokenIds": [
+        "107599671298513506735560638250989418630427723841092755976847858530252723872647",
+        "4582058899759479016612889229595091782642613377703101302787481814489307084939"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766128500000,
+      "endTime": 1766129400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xefd1f44750beb76c507c13a21975be774fda5a832d282f8e931cfac16b2eda12",
+      "question": "Bitcoin Up or Down - December 19, 2:30AM-2:45AM ET",
+      "slug": "btc-updown-15m-1766129400",
+      "tokenIds": [
+        "46097319074945051666824056775491452447885491067773279596289978380640407755785",
+        "55105648342255130695901725527483641505101765234280415555387650650803220447027"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766129400000,
+      "endTime": 1766130300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x7f231c2c59288dea212964534e9d19841d47238da20a40a4fd91c3b9018b877f",
+      "question": "Bitcoin Up or Down - December 19, 2:45AM-3:00AM ET",
+      "slug": "btc-updown-15m-1766130300",
+      "tokenIds": [
+        "34564350994421183943766154682997423606405614405733412624038000817386614882703",
+        "24761183781825159191098811827489636016857756354816145287179315008082395544127"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766130300000,
+      "endTime": 1766131200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x9809e701693dd5e48111de1a72ee05c0bdfc9c22601274d8ab9d200cd0651228",
+      "question": "Bitcoin Up or Down - December 19, 3:00AM-3:15AM ET",
+      "slug": "btc-updown-15m-1766131200",
+      "tokenIds": [
+        "10562099186932650778333474265857815452211155361928592277653398838215093914021",
+        "10118634002058605709211236720807364784469263648777395022998618104682151481773"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87894.52818644207,
+      "startTime": 1766131200000,
+      "endTime": 1766132100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xce99c55001b7e63c20a564ea51676ec2c19ada4b6e51c3d08c90ddcb4fa58a8b",
+      "question": "Bitcoin Up or Down - December 19, 3:15AM-3:30AM ET",
+      "slug": "btc-updown-15m-1766132100",
+      "tokenIds": [
+        "76351838603436529694187861594806091885475398629688583461906347374657411456296",
+        "51448833281555802186658625620136342932451714704966492624159957897980914845383"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766132100000,
+      "endTime": 1766133000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xf40f9355e7930dad20534bb9f51e1f3f1fbd14af9c183cee8b87f072bb43a9e3",
+      "question": "Bitcoin Up or Down - December 19, 3:30AM-3:45AM ET",
+      "slug": "btc-updown-15m-1766133000",
+      "tokenIds": [
+        "65551697468318323177553354937209913203635647569681647706762281335399726221512",
+        "27559859030865225103883660918608082839474137320935063110180030858327600102712"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87681.92698574139,
+      "startTime": 1766133000000,
+      "endTime": 1766133900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe25fcb9429a0d7368736c5d243788ad901a38bed7b5235a1688635fd822ae95d",
+      "question": "Bitcoin Up or Down - December 19, 3:45AM-4:00AM ET",
+      "slug": "btc-updown-15m-1766133900",
+      "tokenIds": [
+        "55200940987348944987031595514973010382854372328374023633531993544560784485577",
+        "90890009866243716886221014983875873230930095876228348558247015997615899154635"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766133900000,
+      "endTime": 1766134800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x155b317eb0fd7dc24d3e625f41eccc1833a8e26f3632214dcdd998ca6483d2ac",
+      "question": "Bitcoin Up or Down - December 19, 4:00AM-4:15AM ET",
+      "slug": "btc-updown-15m-1766134800",
+      "tokenIds": [
+        "105906135302965928489535287637996184610313597755056825453792531890525062623930",
+        "46280495416884873023840931968652681949247843845134177539948860133009637728125"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766134800000,
+      "endTime": 1766135700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xb443efeccfa661ef957cf60041cf742b82f2205eaf6ed2ebef5007a57a5e5f9b",
+      "question": "Bitcoin Up or Down - December 19, 4:15AM-4:30AM ET",
+      "slug": "btc-updown-15m-1766135700",
+      "tokenIds": [
+        "1864969707183288185370997361411790770069759922377588395155267222490139404125",
+        "114073924504777369690993165518437907817972211757015675210616770597281872593763"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766135700000,
+      "endTime": 1766136600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x150b764944f508b92511de3c3bcfea9269cd9e21eaca338294c30a02dc48bd03",
+      "question": "Bitcoin Up or Down - December 19, 4:30AM-4:45AM ET",
+      "slug": "btc-updown-15m-1766136600",
+      "tokenIds": [
+        "71786017404982470567452290771815385561942206798586379151523512502145718684679",
+        "88725887786380846991318505900988751350326555266352060863051331917717744984820"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766136600000,
+      "endTime": 1766137500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xd615c4bfdd8ba26e12f4f5779d49f7a4b073208df26f46cf24ee2a9daff078bb",
+      "question": "Bitcoin Up or Down - December 19, 4:45AM-5:00AM ET",
+      "slug": "btc-updown-15m-1766137500",
+      "tokenIds": [
+        "92490376814404398680888235664004875130936835758346964081994768035117245022060",
+        "15478756747962052730309481191785977971163858257994901893722157428147455693345"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766137500000,
+      "endTime": 1766138400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x4c8ffdfb92a602c9ea82fa81ff7ada4a9d5d52575be386041b3ec5e407befc67",
+      "question": "Bitcoin Up or Down - December 19, 5:00AM-5:15AM ET",
+      "slug": "btc-updown-15m-1766138400",
+      "tokenIds": [
+        "65914576675480308505249224108843341541680563604288813688910961692283791549247",
+        "81664053670644557693977003228831406621099722666119490165226355128875585651147"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766138400000,
+      "endTime": 1766139300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe78ea35d46d7e3f22b9263eb84d22ae06f1892ce8ffff6d50a7b00423eca36ae",
+      "question": "Bitcoin Up or Down - December 19, 5:15AM-5:30AM ET",
+      "slug": "btc-updown-15m-1766139300",
+      "tokenIds": [
+        "112714448480744018145883638246419673356610687247865256443115009028705720728759",
+        "111000143226369598098227446970816024580307296273247984157427038434141982532008"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766139300000,
+      "endTime": 1766140200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe71ee43e7535905cd9c35ba7f3a2e54e728fdc4caaef4a5f27301d14d7005ea1",
+      "question": "Bitcoin Up or Down - December 19, 5:30AM-5:45AM ET",
+      "slug": "btc-updown-15m-1766140200",
+      "tokenIds": [
+        "31422594496434086303292161195291941783825536358298906529346497914521519303924",
+        "112414748075843399171949319771795713082479097817003427391960874255978642137948"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766140200000,
+      "endTime": 1766141100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x68c606ce1c583508b9f24af16436954b580d7da7cc384e012c07b71880b018b5",
+      "question": "Bitcoin Up or Down - December 19, 5:45AM-6:00AM ET",
+      "slug": "btc-updown-15m-1766141100",
+      "tokenIds": [
+        "6899861987000015801984996681312331819779392056725229078736800777968742483463",
+        "67115365398658057765454959718117326110485817467272760228424903817929064999811"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88015.18054352736,
+      "startTime": 1766141100000,
+      "endTime": 1766142000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x800be29b6a5fb7be0d9beecfe05d95cc5350f98e9aaf5057cc0fb9a86ac293e2",
+      "question": "Bitcoin Up or Down - December 19, 6:00AM-6:15AM ET",
+      "slug": "btc-updown-15m-1766142000",
+      "tokenIds": [
+        "34687835664129199993080617288519888035729763332216831787652572881294037178790",
+        "40240728750673178487369790993832098141124800738599217484383235464086990952145"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766142000000,
+      "endTime": 1766142900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x75c275529a601b39dfc24f848422c5fc1e865c58ad8c692d0a2b5a5c6a8c04fd",
+      "question": "Bitcoin Up or Down - December 19, 6:15AM-6:30AM ET",
+      "slug": "btc-updown-15m-1766142900",
+      "tokenIds": [
+        "60276351994644731135067712528124748298529822163949096086683212903217557349801",
+        "58687005731749036308968059672680100470148961816006850552738823117977034534894"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766142900000,
+      "endTime": 1766143800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x16dca4acacd4dafe71db40fa4e40e89359f39f09213510caf87966991ff9c6b9",
+      "question": "Bitcoin Up or Down - December 19, 6:30AM-6:45AM ET",
+      "slug": "btc-updown-15m-1766143800",
+      "tokenIds": [
+        "435171331023436526458660483575030508180652774719739568723070098907383873525",
+        "32052582841068671642336993043945910818714893311499147029914638512687248925777"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88239.899721,
+      "startTime": 1766143800000,
+      "endTime": 1766144700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x1bed11227ebbdb4bdaf975a7585b29bc9eb2dbb6fe5788bb8da4de82d69725c4",
+      "question": "Bitcoin Up or Down - December 19, 6:45AM-7:00AM ET",
+      "slug": "btc-updown-15m-1766144700",
+      "tokenIds": [
+        "92348163889893997249414913026440534155964055934885283694776826960055443371025",
+        "70207612939638034163558565003135900984524797888519370169648189396635939093662"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88241.5641215,
+      "startTime": 1766144700000,
+      "endTime": 1766145600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xc52b80a33da1ac2bb1ee9a5f42243c1962aaf8c00d17f1f838e790e9d931a191",
+      "question": "Bitcoin Up or Down - December 19, 7:00AM-7:15AM ET",
+      "slug": "btc-updown-15m-1766145600",
+      "tokenIds": [
+        "46794739396981466155592769692572193465851193513422933392349709379464934920241",
+        "104530818410598819641272101475794120137862692053017418556234296055412182887310"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766145600000,
+      "endTime": 1766146500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x00b2b6fe974532922fc1e56e214e913d32d58371269df2737765a64148a9c137",
+      "question": "Bitcoin Up or Down - December 19, 7:15AM-7:30AM ET",
+      "slug": "btc-updown-15m-1766146500",
+      "tokenIds": [
+        "449827421032827381966542031112897191369185041198776248986965626533864482318",
+        "50885282328703831965732016553431659238377568193212478843786454409075860282764"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88164.19175827262,
+      "startTime": 1766146500000,
+      "endTime": 1766147400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x7cb71a25efc92320671ebf8d0c2cd1c6d1928a236ac0671667534b2c30a82589",
+      "question": "Bitcoin Up or Down - December 19, 7:30AM-7:45AM ET",
+      "slug": "btc-updown-15m-1766147400",
+      "tokenIds": [
+        "32451084842228116223131555495743727486476139354291673494501878968453409874644",
+        "94185013326497120975197396375273285134252899185110255279425391214356987693024"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766147400000,
+      "endTime": 1766148300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x4b44c831a86ae038a9eb650e2d8bcd29354b209e18ee967ac6e9dec723d0cd22",
+      "question": "Bitcoin Up or Down - December 19, 7:45AM-8:00AM ET",
+      "slug": "btc-updown-15m-1766148300",
+      "tokenIds": [
+        "96429402833841550860435216953152383780205496351074650039016969393134649595203",
+        "46478206140946225779592776292042716849718498153338957684875252669113153102725"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766148300000,
+      "endTime": 1766149200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xdf004b582683d23cbac7fcc9bd20214318415c194942246f00c02daa3179f006",
+      "question": "Bitcoin Up or Down - December 19, 8:00AM-8:15AM ET",
+      "slug": "btc-updown-15m-1766149200",
+      "tokenIds": [
+        "87691703979989428177074552421085391081241587748251673461437194912444467817557",
+        "79410775329792017992134715948105983286585399016674612188451554987949671207856"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766149200000,
+      "endTime": 1766150100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xa7592f511a72997f65a0d288f12e640da25786fe82d9d4de7705aee1701b0c0a",
+      "question": "Bitcoin Up or Down - December 19, 8:15AM-8:30AM ET",
+      "slug": "btc-updown-15m-1766150100",
+      "tokenIds": [
+        "38493976216611446700681869359756860656141802428180482117462423057545895961092",
+        "9658326933733489340965385159717289843845501329138847799846287688274823877518"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766150100000,
+      "endTime": 1766151000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xdab57a1fafdf8db606386fdd6bd2ad6bc1cecb385ac00a87df35c6ea09a344ae",
+      "question": "Bitcoin Up or Down - December 19, 8:30AM-8:45AM ET",
+      "slug": "btc-updown-15m-1766151000",
+      "tokenIds": [
+        "111710089217359002034370796850130791993501132566272160762625750724036640477159",
+        "97820140808980674528613353958434500990164372919797626798724503135062246148918"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766151000000,
+      "endTime": 1766151900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x9004b4c7b16708a0fde815f9e0ea21113e62ddd7b4694cb57df60da875adb0de",
+      "question": "Bitcoin Up or Down - December 19, 8:45AM-9:00AM ET",
+      "slug": "btc-updown-15m-1766151900",
+      "tokenIds": [
+        "98821868920419390573470299331018825729411400687929994914199731660537102841364",
+        "24720261270920665992433021530232576012344221618298787003133801912636105153748"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766151900000,
+      "endTime": 1766152800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xb00f5fb53100e1daac46c4bdd83b05fb5e762afe62f4ae3054238bb8c1a828f3",
+      "question": "Bitcoin Up or Down - December 19, 9:00AM-9:15AM ET",
+      "slug": "btc-updown-15m-1766152800",
+      "tokenIds": [
+        "19141301479363604705506675718088003346473912275383733358003373594803895707135",
+        "48069234805473673940185013630572012696289629566535982726424594973433086610949"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766152800000,
+      "endTime": 1766153700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x9692d8cb941025543c9cfac266603fd514231d40e6c1c295f16308dc90b5cbdc",
+      "question": "Bitcoin Up or Down - December 19, 9:15AM-9:30AM ET",
+      "slug": "btc-updown-15m-1766153700",
+      "tokenIds": [
+        "86533836763301705070152297575894762492204874032076314504443912443113231127587",
+        "51152099897818315709518318348533835461626765952515467570457912670836215537475"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766153700000,
+      "endTime": 1766154600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x011d8271f25990575e534eab6eb86ae3f746562e33f97e958c911dff88cc865e",
+      "question": "Bitcoin Up or Down - December 19, 9:30AM-9:45AM ET",
+      "slug": "btc-updown-15m-1766154600",
+      "tokenIds": [
+        "106655195093046006907619738503590138230573856331780842997519773311524136519239",
+        "43958336767191392134638186170683639115736786946131760026452900626440197906288"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766154600000,
+      "endTime": 1766155500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x1879a0d44ddec0f2584fdfc99da6c09a405c2ea26c35bccf2f46a0da15ae6b01",
+      "question": "Bitcoin Up or Down - December 19, 9:45AM-10:00AM ET",
+      "slug": "btc-updown-15m-1766155500",
+      "tokenIds": [
+        "101423172676914381554897573530119318050758825498820593405394212749538340892231",
+        "37153633120357510784339893881763037029829676066680499231971659637455595809039"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766155500000,
+      "endTime": 1766156400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x4716ee01271720a49af2bb55a6cb8e0a5e0d88a8464cd8f0ce7ab47120b65830",
+      "question": "Bitcoin Up or Down - December 19, 10:00AM-10:15AM ET",
+      "slug": "btc-updown-15m-1766156400",
+      "tokenIds": [
+        "71158807433476930481363516670737997616435852927329366096538730235853259957679",
+        "103406444814917346835371079272644746582010774889375360890790637531206515796681"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88127.17260984035,
+      "startTime": 1766156400000,
+      "endTime": 1766157300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x37638d6e95b62a480c2bae222863a6266bc1a358c80dc323cb9d55b609c3a987",
+      "question": "Bitcoin Up or Down - December 19, 10:15AM-10:30AM ET",
+      "slug": "btc-updown-15m-1766157300",
+      "tokenIds": [
+        "32493185848498265781833508782005182107400721242516314743853262757164209457281",
+        "71094587093265666547015008925801911283877371531715282631885070862979981053068"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88716.57879672595,
+      "startTime": 1766157300000,
+      "endTime": 1766158200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xd96a54dbf804ee2559b4bd907642ebf018936dc26206238fd1ad6525d6f1a091",
+      "question": "Bitcoin Up or Down - December 19, 10:30AM-10:45AM ET",
+      "slug": "btc-updown-15m-1766158200",
+      "tokenIds": [
+        "43343285774350721369376460072677263688248782889094088532729243733380122501558",
+        "67529675482185129078748615366212651382057583467123699265318185768679383007515"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88144.07088456527,
+      "startTime": 1766158200000,
+      "endTime": 1766159100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xe208ce0764d6ed25e980659c5d8f92367f54dff9a4ba9a44d32937f148869b19",
+      "question": "Bitcoin Up or Down - December 19, 10:45AM-11:00AM ET",
+      "slug": "btc-updown-15m-1766159100",
+      "tokenIds": [
+        "89664338743272545117921217692495418924247561432789122433539086342114337209490",
+        "96848351810780140807637830378700716904283531351248002569171707301577615435817"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766159100000,
+      "endTime": 1766160000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x66ad0e57e056adc3a342258319f20442a403c113ec6c37fddc9910fc11124830",
+      "question": "Bitcoin Up or Down - December 19, 11:00AM-11:15AM ET",
+      "slug": "btc-updown-15m-1766160000",
+      "tokenIds": [
+        "37344012590001836183282675523510487976643611534787351187757857814166193056445",
+        "50568370660108015810950319207813752796044382206134856844762354759626127805151"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766160000000,
+      "endTime": 1766160900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x28ba8c38518dbff388a751c9c2816f30561760937fd3b3b5d5f38426fb114c5e",
+      "question": "Bitcoin Up or Down - December 19, 11:15AM-11:30AM ET",
+      "slug": "btc-updown-15m-1766160900",
+      "tokenIds": [
+        "75228191233362841837484766001957323152545575721739327258616370684218081081264",
+        "11341758994466155957698272602480053547840286125687644106950363104619599725852"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 88332.76315353793,
+      "startTime": 1766160900000,
+      "endTime": 1766161800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x4c0044314c72409873d6b08adaab865cbbff7006c06233980c1f08e37a78c9d3",
+      "question": "Bitcoin Up or Down - December 19, 11:30AM-11:45AM ET",
+      "slug": "btc-updown-15m-1766161800",
+      "tokenIds": [
+        "58105906260427413723451522402745849252571753034912371011712182321901359665102",
+        "115538401330132744814760919702993904125692591010514052008652739134569959655810"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766161800000,
+      "endTime": 1766162700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x5498503a1f51a0dd62e160737a1e7e2343cb89c67435a004110b0d02ce629d64",
+      "question": "Bitcoin Up or Down - December 19, 11:45AM-12:00PM ET",
+      "slug": "btc-updown-15m-1766162700",
+      "tokenIds": [
+        "62738672980003018170039052195816411886087038534433402690647237049287454808203",
+        "23977880461533631990852268912222278468382292938361570446171584983539231932748"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766162700000,
+      "endTime": 1766163600000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x97516f8d130e815efc49be33c3b2a07a2824fd457313dbf7ea5ac0c74eeab236",
+      "question": "Bitcoin Up or Down - December 19, 12:00PM-12:15PM ET",
+      "slug": "btc-updown-15m-1766163600",
+      "tokenIds": [
+        "17800935050708341773233085238859341175086060178816006174670422024906505646350",
+        "14255784735651685382568641029549792051452089224970279375727952979554708250293"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766163600000,
+      "endTime": 1766164500000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xbb4744bf579797dd058a996ff32200c038a4bb762fd18b463667c4943f241a47",
+      "question": "Bitcoin Up or Down - December 19, 12:15PM-12:30PM ET",
+      "slug": "btc-updown-15m-1766164500",
+      "tokenIds": [
+        "66660176673680770115359413203499453415576457141447271323893419917332866032069",
+        "15809402086537645056751713248880292103728236250985865557509194258920593576273"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766164500000,
+      "endTime": 1766165400000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x6dea164ae215ee66e300d5a84ff226cb0fc33198c9837a65961c71585286c550",
+      "question": "Bitcoin Up or Down - December 19, 12:30PM-12:45PM ET",
+      "slug": "btc-updown-15m-1766165400",
+      "tokenIds": [
+        "27825107885050042296223811399992039827887771667064766484897523856306289762738",
+        "54860320743829567198930650119234277315476357202341939316425415749578801349639"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766165400000,
+      "endTime": 1766166300000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x75710e66ece2526beda44f0afc05c86faa2c5b9879ff499b941a2346b4b1a401",
+      "question": "Bitcoin Up or Down - December 19, 12:45PM-1:00PM ET",
+      "slug": "btc-updown-15m-1766166300",
+      "tokenIds": [
+        "56169902592367154378503999144982861158535592688361813257899332317232650269070",
+        "26864367009468960371086063697853674653872912650523749113001779706659696106230"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87066.87217166554,
+      "startTime": 1766166300000,
+      "endTime": 1766167200000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x148c3cb99518ae4f5bffa8ea20801048d089ca11763de47802768f52f938b12e",
+      "question": "Bitcoin Up or Down - December 19, 1:00PM-1:15PM ET",
+      "slug": "btc-updown-15m-1766167200",
+      "tokenIds": [
+        "11640733815232665606455326852698437240650981145780930704363671510744150910409",
+        "92605217644784897557473569040255009567879245881711355337439103448129588857232"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86893.7444719806,
+      "startTime": 1766167200000,
+      "endTime": 1766168100000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x91399b1baebb0a1adcfe6dcdbbd90ae6bc7b8d128a7640f719d49d483a2b88eb",
+      "question": "Bitcoin Up or Down - December 19, 1:15PM-1:30PM ET",
+      "slug": "btc-updown-15m-1766168100",
+      "tokenIds": [
+        "79705405142550066264603253666122413589708984783942537378841443894028177930470",
+        "22315835941149606766726057819162541441272502834379708546822560109541794923829"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766168100000,
+      "endTime": 1766169000000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x0a0d3e24c4def9a0b5135d5aeb442c34a1d56177c509697a0dc4819c61aed947",
+      "question": "Bitcoin Up or Down - December 19, 1:30PM-1:45PM ET",
+      "slug": "btc-updown-15m-1766169000",
+      "tokenIds": [
+        "44842251336029381695739291347582436726550649405316717871289091620329586479939",
+        "100193816488980939586774782409695886814965572209850241924219261689485120396445"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766169000000,
+      "endTime": 1766169900000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x2e138029acc4e01834793e4f44ff3342c64655c71fa91e21c3beeebb6523c46f",
+      "question": "Bitcoin Up or Down - December 19, 1:45PM-2:00PM ET",
+      "slug": "btc-updown-15m-1766169900",
+      "tokenIds": [
+        "72189616331172228595829529617392104615572962736467872352917692352923370431519",
+        "57564598707677218021593311436433838555410471236217113639908368007391630451545"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 86963.99574107627,
+      "startTime": 1766169900000,
+      "endTime": 1766170800000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0x7ee05aad8860296ef021fe20cdc74efa96513b98aac47f42aa8124a74e1249da",
+      "question": "Bitcoin Up or Down - December 19, 2:00PM-2:15PM ET",
+      "slug": "btc-updown-15m-1766170800",
+      "tokenIds": [
+        "79560877378612453990185970730672930301585585352199628277439117589920383053036",
+        "65925092254456360116559374704238550362587480735037737898538327728305845135906"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 87103.04768685023,
+      "startTime": 1766170800000,
+      "endTime": 1766171700000,
+      "resolved": false
+    },
+    {
+      "conditionId": "0xfcd9b0021676b133781b6a6b4d157b11e32bc93eb22701f339578046ea6a11e0",
+      "question": "Bitcoin Up or Down - December 19, 2:15PM-2:30PM ET",
+      "slug": "btc-updown-15m-1766171700",
+      "tokenIds": [
+        "60823031228220288921821152351754622670224294869995350307000167954584871809095",
+        "30358897546531098817784414425111741380875915335883367315702475145100982041911"
+      ],
+      "outcomes": [
+        "Up",
+        "Down"
+      ],
+      "strikePrice": 0,
+      "startTime": 1766171700000,
+      "endTime": 1766172600000,
+      "resolved": false
+    }
+  ]
+}

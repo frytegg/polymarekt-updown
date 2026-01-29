@@ -1,0 +1,24 @@
+{
+  "config": {
+    "startDate": "2025-12-12T19:58:30.939Z",
+    "endDate": "2025-12-19T19:58:30.939Z",
+    "initialCapital": null,
+    "spreadCents": 8,
+    "minEdge": 0.07,
+    "orderSize": 10,
+    "maxPositionPerMarket": 100
+  },
+  "results": {
+    "totalMarkets": 181,
+    "totalTrades": 823,
+    "totalPnL": 1258.5999999999997,
+    "totalVolume": 3521.4000000000005,
+    "winRate": 0.5808019441069259,
+    "marketWinRate": 0.6298342541436464,
+    "avgEdge": 0.15376630408935224,
+    "realizedEdge": 0.9945502167252641,
+    "sharpeRatio": 59.313155009091794,
+    "maxDrawdown": 82.00000000000011
+  },
+  "exportedAt": "2025-12-19T20:02:41.653Z"
+}
