@@ -129,6 +129,29 @@ export function getBtcPriceAt(klines: BinanceKline[], timestamp: number): number
 }
 
 /**
+ * Get full kline at a specific timestamp (finds closest kline at or before)
+ */
+export function getKlineAt(klines: BinanceKline[], timestamp: number): BinanceKline | null {
+  if (klines.length === 0) return null;
+
+  // Binary search for closest timestamp
+  let left = 0;
+  let right = klines.length - 1;
+
+  while (left < right) {
+    const mid = Math.floor((left + right) / 2);
+    if (klines[mid].timestamp < timestamp) {
+      left = mid + 1;
+    } else {
+      right = mid;
+    }
+  }
+
+  const idx = Math.max(0, left - 1);
+  return klines[idx];
+}
+
+/**
  * Interpolate BTC prices for given timestamps
  */
 export function interpolatePrices(
@@ -335,6 +358,42 @@ export class BinanceHistoricalFetcher {
 
   getKlines(): BinanceKline[] {
     return this.cache;
+  }
+
+  /**
+   * Get the full kline at or before a timestamp
+   */
+  getKlineAt(timestamp: number): BinanceKline | null {
+    if (this.cache.length === 0) return null;
+    const idx = this.getKlineIndex(timestamp);
+    return this.cache[idx] || null;
+  }
+
+  /**
+   * Get worst-case execution price for a trade direction
+   * For buys: use high (price moved up before fill)
+   * For sells: use low (price moved down before fill)
+   */
+  getWorstCasePrice(timestamp: number, side: 'buy' | 'sell'): number {
+    const kline = this.getKlineAt(timestamp);
+    if (!kline) return this.getPriceAt(timestamp);
+    return side === 'buy' ? kline.high : kline.low;
+  }
+
+  private getKlineIndex(timestamp: number): number {
+    let left = 0;
+    let right = this.cache.length - 1;
+
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (this.cache[mid].timestamp < timestamp) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+
+    return Math.max(0, left - 1);
   }
 }
 

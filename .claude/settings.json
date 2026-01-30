@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|tsx)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const{execSync}=require('child_process');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{execSync('npx tsc --noEmit --pretty false 2>&1',{encoding:'utf8'})}catch(e){const lines=(e.stdout||'').split('\\n').filter(l=>l.includes('error')).slice(0,5);if(lines.length)console.error('[TypeScript] '+lines.join('\\n'))}console.log(d)})\""
+          }
+        ],
+        "description": "TypeScript type-check after .ts edits"
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(ts|js)$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');if(/console\\.log/.test(c))console.error('[Hook] ⚠️ console.log found in '+p+' - remove before commit')}console.log(d)})\""
+          }
+        ],
+        "description": "Warn about console.log in JS/TS files"
+      }
+    ]
+  }
+}

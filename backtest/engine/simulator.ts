@@ -19,6 +19,7 @@ import { BinanceHistoricalFetcher } from '../fetchers/binance-historical';
 import { PolymarketMarketsFetcher, determineOutcome } from '../fetchers/polymarket-markets';
 import { PolymarketPricesFetcher } from '../fetchers/polymarket-prices';
 import { DeribitVolFetcher } from '../fetchers/deribit-vol';
+import { ChainlinkHistoricalFetcher } from '../fetchers/chainlink-historical';
 import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
 import { calculateFairValue } from '../../fair-value';
@@ -57,6 +58,7 @@ export class Simulator {
     private marketsFetcher: PolymarketMarketsFetcher;
     private pricesFetcher: PolymarketPricesFetcher;
     private volFetcher: DeribitVolFetcher;
+    private chainlinkFetcher: ChainlinkHistoricalFetcher;
     private orderMatcher: OrderMatcher;
     private positionTracker: PositionTracker;
 
@@ -67,6 +69,7 @@ export class Simulator {
         this.marketsFetcher = new PolymarketMarketsFetcher();
         this.pricesFetcher = new PolymarketPricesFetcher(1); // 1 minute fidelity
         this.volFetcher = new DeribitVolFetcher('BTC', 60);  // 1 minute resolution
+        this.chainlinkFetcher = new ChainlinkHistoricalFetcher();
         this.orderMatcher = new OrderMatcher({ spreadCents: this.config.spreadCents });
         this.positionTracker = new PositionTracker();
     }
@@ -109,8 +112,13 @@ export class Simulator {
         const volPoints = await this.volFetcher.fetch(startTs, endTs);
         console.log(`   Loaded ${volPoints.length} volatility points\n`);
 
-        // Step 4: Process each market
-        console.log('⚙️ Step 4: Processing markets...\n');
+        // Step 4: Fetch Chainlink prices for market resolution
+        console.log('📡 Step 4: Fetching Chainlink oracle prices...');
+        const chainlinkPrices = await this.chainlinkFetcher.fetch(startTs, endTs);
+        console.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
+
+        // Step 5: Process each market
+        console.log('⚙️ Step 5: Processing markets...\n');
         let processedMarkets = 0;
 
         for (const market of markets) {
@@ -176,8 +184,23 @@ export class Simulator {
             this.processTick(market, tick);
         }
 
-        // Resolve market at end
-        const finalBtcPrice = this.binanceFetcher.getPriceAt(market.endTime);
+        // Resolve market at end using Chainlink (matches Polymarket's oracle)
+        const chainlinkPoint = this.chainlinkFetcher.getClosestPrice(market.endTime, 60000);
+        const binancePrice = this.binanceFetcher.getPriceAt(market.endTime);
+
+        let finalBtcPrice: number;
+        if (chainlinkPoint) {
+            finalBtcPrice = chainlinkPoint.price;
+
+            // Log significant divergence (> $50 difference)
+            if (binancePrice && Math.abs(chainlinkPoint.price - binancePrice) > 50) {
+                console.log(`   ⚠️ Oracle divergence at ${new Date(market.endTime).toISOString()}: Chainlink=$${chainlinkPoint.price.toFixed(2)}, Binance=$${binancePrice.toFixed(2)}`);
+            }
+        } else {
+            console.warn(`   ⚠️ No Chainlink price for ${new Date(market.endTime).toISOString()}, using Binance`);
+            finalBtcPrice = binancePrice!;
+        }
+
         const outcome = determineOutcome(finalBtcPrice, market.strikePrice);
 
         this.positionTracker.resolve(

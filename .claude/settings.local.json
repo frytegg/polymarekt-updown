@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(gh:*)",
+      "Bash(winget install:*)",
+      "Bash(powershell.exe -Command \"winget install GitHub.cli --accept-source-agreements --accept-package-agreements\")",
+      "Bash(powershell.exe -Command \"scoop --version\")",
+      "Bash(powershell.exe -Command \"choco --version\")",
+      "Bash(powershell.exe -Command \"scoop install gh\")",
+      "Bash(powershell.exe -Command \"gh --version\")",
+      "Bash(powershell.exe -Command \"gh auth status\")",
+      "Bash(powershell.exe -Command \"gh repo list --limit 5\")"
     ]
   }
 }
