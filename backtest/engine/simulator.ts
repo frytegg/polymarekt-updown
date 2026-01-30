@@ -245,7 +245,8 @@ export class Simulator {
 
             // Get kline index for this timestamp
             const klineIdx = this.getKlineIndex(btcKlines, btcTimestamp);
-            const btcPrice = btcKlines[klineIdx]?.close;
+            const kline = btcKlines[klineIdx];
+            const btcPrice = kline?.close;
             if (!btcPrice) continue;
 
             // Get DVOL at this timestamp
@@ -261,6 +262,7 @@ export class Simulator {
             ticks.push({
                 timestamp: ts,
                 btcPrice,
+                btcKline: kline,
                 polyMidYes: polyPrice.price,
                 polyMidNo: 1 - polyPrice.price,
                 vol,
@@ -295,6 +297,7 @@ export class Simulator {
 
     /**
      * Check if we should trade and execute if so
+     * Uses worst-case BTC price from kline for conservative edge calculation
      */
     private checkAndTrade(
         market: HistoricalMarket,
@@ -303,7 +306,25 @@ export class Simulator {
         side: 'YES' | 'NO',
         midPrice: number
     ): void {
-        const fv = side === 'YES' ? fairValue.pUp : fairValue.pDown;
+        // Get worst-case BTC price for this side
+        // Buying YES = betting BTC goes UP → worst case: BTC was at LOW (P(up) is lower)
+        // Buying NO = betting BTC goes DOWN → worst case: BTC was at HIGH (P(down) is lower)
+        let worstCaseBtc: number;
+        if (side === 'YES') {
+            worstCaseBtc = tick.btcKline?.low ?? tick.btcPrice;
+        } else {
+            worstCaseBtc = tick.btcKline?.high ?? tick.btcPrice;
+        }
+
+        // Recalculate fair value with worst-case BTC price
+        const worstCaseFV = calculateFairValue(
+            worstCaseBtc,
+            market.strikePrice,
+            tick.timeRemainingMs / 1000,
+            tick.vol
+        );
+
+        const fv = side === 'YES' ? worstCaseFV.pUp : worstCaseFV.pDown;
         const buyPrice = this.orderMatcher.getBuyPrice(midPrice);
         const edge = fv - buyPrice;
 
@@ -329,10 +350,10 @@ export class Simulator {
             size: this.config.orderSize,
         };
 
-        // Execute trade
+        // Execute trade - record worst-case BTC price
         const trade = this.orderMatcher.executeBuy(
             signal,
-            tick.btcPrice,
+            worstCaseBtc,
             market.strikePrice,
             tick.timeRemainingMs
         );

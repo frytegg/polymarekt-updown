@@ -59,7 +59,8 @@ export interface DeribitVolPoint {
  */
 export interface AlignedTick {
     timestamp: number;
-    btcPrice: number;           // From Binance
+    btcPrice: number;           // From Binance (close price)
+    btcKline?: BinanceKline;    // Full kline for worst-case simulation
     polyMidYes: number;         // Polymarket YES mid price
     polyMidNo: number;          // Polymarket NO mid price (usually 1 - YES)
     vol: number;                // Blended vol: 70% realized 1h + 20% realized 4h + 10% DVOL
