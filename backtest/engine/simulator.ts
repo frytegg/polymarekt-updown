@@ -33,6 +33,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
     orderSize: 100,           // 100 shares per order
     maxPositionPerMarket: 1000, // Max 1000 shares per side
     lagSeconds: 0,            // No lag by default
+    executionLatencyMs: 0,    // No execution latency by default
 };
 
 /**
@@ -61,6 +62,7 @@ export class Simulator {
     private chainlinkFetcher: ChainlinkHistoricalFetcher;
     private orderMatcher: OrderMatcher;
     private positionTracker: PositionTracker;
+    private currentKlines: BinanceKline[] = [];
 
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -105,6 +107,7 @@ export class Simulator {
         // Step 2: Fetch Binance klines for entire period
         console.log('📡 Step 2: Fetching Binance BTC prices...');
         const btcKlines = await this.binanceFetcher.fetch(startTs, endTs);
+        this.currentKlines = btcKlines;
         console.log(`   Loaded ${btcKlines.length} price points\n`);
 
         // Step 3: Fetch Deribit volatility for entire period
@@ -298,6 +301,7 @@ export class Simulator {
     /**
      * Check if we should trade and execute if so
      * Uses worst-case BTC price from kline for conservative edge calculation
+     * Applies execution latency if configured
      */
     private checkAndTrade(
         market: HistoricalMarket,
@@ -306,7 +310,7 @@ export class Simulator {
         side: 'YES' | 'NO',
         midPrice: number
     ): void {
-        // Get worst-case BTC price for this side
+        // Get worst-case BTC price for this side (for decision)
         // Buying YES = betting BTC goes UP → worst case: BTC was at LOW (P(up) is lower)
         // Buying NO = betting BTC goes DOWN → worst case: BTC was at HIGH (P(down) is lower)
         let worstCaseBtc: number;
@@ -339,9 +343,29 @@ export class Simulator {
             this.config.maxPositionPerMarket
         )) return;
 
+        // Calculate execution timestamp with latency
+        const executionTs = tick.timestamp + this.config.executionLatencyMs;
+
+        // Skip if execution would be too close to market end
+        if (executionTs >= market.endTime - 30000) return;
+
+        // Get kline at execution time (may differ from decision-time kline)
+        let execBtcPrice = worstCaseBtc;
+        if (this.config.executionLatencyMs > 0 && this.currentKlines.length > 0) {
+            const execKlineIdx = this.getKlineIndex(this.currentKlines, executionTs);
+            const execKline = this.currentKlines[execKlineIdx];
+            if (execKline) {
+                // Use worst-case price from execution-time kline
+                execBtcPrice = side === 'YES' ? execKline.low : execKline.high;
+            }
+        }
+
+        // Time remaining from execution timestamp
+        const execTimeRemainingMs = market.endTime - executionTs;
+
         // Create signal
         const signal: TradeSignal = {
-            timestamp: tick.timestamp,
+            timestamp: executionTs,
             marketId: market.conditionId,
             side,
             fairValue: fv,
@@ -350,12 +374,12 @@ export class Simulator {
             size: this.config.orderSize,
         };
 
-        // Execute trade - record worst-case BTC price
+        // Execute trade - record execution-time BTC price
         const trade = this.orderMatcher.executeBuy(
             signal,
-            worstCaseBtc,
+            execBtcPrice,
             market.strikePrice,
-            tick.timeRemainingMs
+            execTimeRemainingMs
         );
 
         // Record trade

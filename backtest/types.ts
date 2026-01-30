@@ -156,6 +156,7 @@ export interface BacktestConfig {
     orderSize: number;         // Shares per order
     maxPositionPerMarket: number;  // Max shares per side per market
     lagSeconds: number;        // Lag between BTC price observation and Polymarket execution (default 0)
+    executionLatencyMs: number;    // Simulated execution delay in ms (default: 0)
 }
 
 /**
