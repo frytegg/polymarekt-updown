@@ -5,6 +5,7 @@
 
 import {
     BacktestConfig,
+    BacktestMode,
     BacktestResult,
     HistoricalMarket,
     AlignedTick,
@@ -19,7 +20,7 @@ import { BinanceHistoricalFetcher } from '../fetchers/binance-historical';
 import { PolymarketMarketsFetcher, determineOutcome } from '../fetchers/polymarket-markets';
 import { PolymarketPricesFetcher } from '../fetchers/polymarket-prices';
 import { DeribitVolFetcher } from '../fetchers/deribit-vol';
-import { ChainlinkHistoricalFetcher } from '../fetchers/chainlink-historical';
+import { ChainlinkHistoricalFetcher, ChainlinkPricePoint } from '../fetchers/chainlink-historical';
 import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
 import { calculateFairValue } from '../../fair-value';
@@ -34,6 +35,10 @@ const DEFAULT_CONFIG: BacktestConfig = {
     maxPositionPerMarket: 1000, // Max 1000 shares per side
     lagSeconds: 0,            // No lag by default
     executionLatencyMs: 0,    // No execution latency by default
+    useChainlinkForFairValue: false, // Use Binance by default
+    volMultiplier: 1.0,       // No vol adjustment by default
+    mode: 'normal',           // Normal mode by default
+    binanceChainlinkAdjustment: 0, // No adjustment by default (set to -104 for divergence correction)
 };
 
 /**
@@ -64,8 +69,15 @@ export class Simulator {
     private positionTracker: PositionTracker;
     private currentKlines: BinanceKline[] = [];
 
+    // Mode-derived settings
+    private useWorstCasePricing: boolean = false;
+    private effectiveLatencyMs: number = 0;
+
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+
+        // Apply mode settings
+        this.applyModeSettings();
 
         this.binanceFetcher = new BinanceHistoricalFetcher('BTCUSDT', '1m');
         this.marketsFetcher = new PolymarketMarketsFetcher();
@@ -77,6 +89,23 @@ export class Simulator {
     }
 
     /**
+     * Apply mode-specific settings
+     * Conservative mode: worst-case pricing + 200ms latency
+     * Normal mode: close price + no latency
+     */
+    private applyModeSettings(): void {
+        if (this.config.mode === 'conservative') {
+            this.useWorstCasePricing = true;
+            // Use configured latency or default to 200ms in conservative mode
+            this.effectiveLatencyMs = this.config.executionLatencyMs || 200;
+        } else {
+            // Normal mode: use close price, no worst-case
+            this.useWorstCasePricing = false;
+            this.effectiveLatencyMs = this.config.executionLatencyMs;
+        }
+    }
+
+    /**
      * Run the backtest
      */
     async run(): Promise<BacktestResult> {
@@ -85,7 +114,12 @@ export class Simulator {
         console.log(`💰 Capital: ${this.config.initialCapital === Infinity ? 'Unlimited' : `$${this.config.initialCapital}`}`);
         console.log(`📊 Spread: ${this.config.spreadCents}¢ | Min Edge: ${(this.config.minEdge * 100).toFixed(1)}%`);
         console.log(`📦 Order Size: ${this.config.orderSize} shares | Max Position: ${this.config.maxPositionPerMarket}`);
-        console.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)\n`);
+        console.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)`);
+        console.log(`🔗 Fair Value Oracle: ${this.config.useChainlinkForFairValue ? 'CHAINLINK' : 'BINANCE'}`);
+        if (!this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0) {
+            console.log(`📐 Binance→Chainlink Adjustment: $${this.config.binanceChainlinkAdjustment} (applied to Binance prices)`);
+        }
+        console.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)\n`);
 
         const startTs = this.config.startDate.getTime();
         const endTs = this.config.endDate.getTime();
@@ -131,7 +165,7 @@ export class Simulator {
                 continue;
             }
 
-            await this.processMarket(market, btcKlines, volPoints);
+            await this.processMarket(market, btcKlines, volPoints, chainlinkPrices);
             processedMarkets++;
 
             if (processedMarkets % 10 === 0) {
@@ -151,7 +185,8 @@ export class Simulator {
     private async processMarket(
         market: HistoricalMarket,
         btcKlines: BinanceKline[],
-        volPoints: DeribitVolPoint[]
+        volPoints: DeribitVolPoint[],
+        chainlinkPrices: ChainlinkPricePoint[]
     ): Promise<void> {
         // Fetch Polymarket prices for this market
         let polyPrices: PolymarketPricePoint[] = [];
@@ -175,7 +210,8 @@ export class Simulator {
             market,
             btcKlines,
             polyPrices,
-            volPoints
+            volPoints,
+            chainlinkPrices
         );
 
         if (ticks.length === 0) {
@@ -216,10 +252,10 @@ export class Simulator {
 
     /**
      * Align data from different sources into unified ticks
-     * 
+     *
      * With lag: We see BTC price at T-lag, then trade on Polymarket at T
      * This simulates the delay between seeing an opportunity and executing
-     * 
+     *
      * Volatility: Uses blended vol (70% realized 1h + 20% realized 4h + 10% DVOL)
      * Same as live trading for consistency
      */
@@ -227,10 +263,12 @@ export class Simulator {
         market: HistoricalMarket,
         btcKlines: BinanceKline[],
         polyPrices: PolymarketPricePoint[],
-        volPoints: DeribitVolPoint[]
+        volPoints: DeribitVolPoint[],
+        chainlinkPrices: ChainlinkPricePoint[]
     ): AlignedTick[] {
         const ticks: AlignedTick[] = [];
         const lagMs = this.config.lagSeconds * 1000;
+        const useChainlink = this.config.useChainlinkForFairValue;
 
         // Use Polymarket price timestamps as base (they define when we EXECUTE)
         for (const polyPrice of polyPrices) {
@@ -246,17 +284,31 @@ export class Simulator {
             // Skip if BTC timestamp is before market start (not enough data)
             if (btcTimestamp < market.startTime - 60000) continue;
 
-            // Get kline index for this timestamp
+            // Get kline index for this timestamp (needed for volatility calc)
             const klineIdx = this.getKlineIndex(btcKlines, btcTimestamp);
             const kline = btcKlines[klineIdx];
-            const btcPrice = kline?.close;
+
+            // Get BTC price - either from Chainlink or Binance based on config
+            let btcPrice: number | null = null;
+            if (useChainlink) {
+                // Use Chainlink price for fair value calculation
+                const chainlinkPoint = this.getChainlinkPriceAt(chainlinkPrices, btcTimestamp);
+                btcPrice = chainlinkPoint?.price ?? null;
+            } else {
+                // Use Binance price (default) with optional adjustment
+                btcPrice = kline?.close ?? null;
+                if (btcPrice !== null && this.config.binanceChainlinkAdjustment !== 0) {
+                    btcPrice = btcPrice + this.config.binanceChainlinkAdjustment;
+                }
+            }
+
             if (!btcPrice) continue;
 
             // Get DVOL at this timestamp
             const dvolVol = this.getDvolAt(volPoints, btcTimestamp);
 
             // Calculate blended volatility (realized + implied)
-            // Same blend as live trading: 70% realized 1h + 20% realized 4h + 10% DVOL
+            // Always use Binance klines for realized vol calculation
             const vol = this.getBlendedVol(btcKlines, klineIdx, dvolVol);
 
             // Time remaining based on when we EXECUTE (T), not when we decide (T-lag)
@@ -277,18 +329,49 @@ export class Simulator {
     }
 
     /**
+     * Get Chainlink price at or just before timestamp
+     */
+    private getChainlinkPriceAt(prices: ChainlinkPricePoint[], timestamp: number): ChainlinkPricePoint | null {
+        if (prices.length === 0) return null;
+
+        // Binary search for price at or just before timestamp
+        let left = 0;
+        let right = prices.length - 1;
+
+        while (left < right) {
+            const mid = Math.floor((left + right + 1) / 2);
+            if (prices[mid].timestamp <= timestamp) {
+                left = mid;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        // Check if within 2 minutes (Chainlink updates less frequently)
+        const point = prices[left];
+        if (timestamp - point.timestamp > 120000) {
+            return null;
+        }
+
+        return point;
+    }
+
+    /**
      * Process a single tick - check for trading opportunities
      */
     private processTick(market: HistoricalMarket, tick: AlignedTick): void {
         // Skip if too close to resolution (< 30 seconds)
         if (tick.timeRemainingMs < 30 * 1000) return;
 
-        // Calculate fair value
+        // Apply vol multiplier for short-term adjustment
+        const adjustedVol = tick.vol * this.config.volMultiplier;
+
+        // Calculate fair value with adjusted volatility
         const fairValue = calculateFairValue(
             tick.btcPrice,
             market.strikePrice,
             tick.timeRemainingMs / 1000, // Convert to seconds
-            tick.vol
+            adjustedVol
         );
 
         // Check YES opportunity
@@ -300,8 +383,9 @@ export class Simulator {
 
     /**
      * Check if we should trade and execute if so
-     * Uses worst-case BTC price from kline for conservative edge calculation
-     * Applies execution latency if configured
+     * In conservative mode: uses worst-case BTC price from kline
+     * In normal mode: uses close price
+     * Applies execution latency based on mode
      */
     private checkAndTrade(
         market: HistoricalMarket,
@@ -310,25 +394,37 @@ export class Simulator {
         side: 'YES' | 'NO',
         midPrice: number
     ): void {
-        // Get worst-case BTC price for this side (for decision)
-        // Buying YES = betting BTC goes UP → worst case: BTC was at LOW (P(up) is lower)
-        // Buying NO = betting BTC goes DOWN → worst case: BTC was at HIGH (P(down) is lower)
-        let worstCaseBtc: number;
-        if (side === 'YES') {
-            worstCaseBtc = tick.btcKline?.low ?? tick.btcPrice;
+        // Get BTC price for fair value calculation
+        // Conservative: worst-case from kline (low for YES, high for NO)
+        // Normal: close price (already adjusted in alignTicks)
+        let btcPriceForFV: number;
+        if (this.useWorstCasePricing) {
+            // Buying YES = betting BTC goes UP → worst case: BTC was at LOW (P(up) is lower)
+            // Buying NO = betting BTC goes DOWN → worst case: BTC was at HIGH (P(down) is lower)
+            const rawPrice = side === 'YES'
+                ? (tick.btcKline?.low ?? tick.btcPrice)
+                : (tick.btcKline?.high ?? tick.btcPrice);
+            // Apply Binance→Chainlink adjustment if using Binance
+            btcPriceForFV = !this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0
+                ? rawPrice + this.config.binanceChainlinkAdjustment
+                : rawPrice;
         } else {
-            worstCaseBtc = tick.btcKline?.high ?? tick.btcPrice;
+            // Normal mode: use close price (already adjusted in alignTicks)
+            btcPriceForFV = tick.btcPrice;
         }
 
-        // Recalculate fair value with worst-case BTC price
-        const worstCaseFV = calculateFairValue(
-            worstCaseBtc,
+        // Apply vol multiplier for short-term adjustment
+        const adjustedVol = tick.vol * this.config.volMultiplier;
+
+        // Recalculate fair value with selected BTC price and adjusted vol
+        const recalcFV = calculateFairValue(
+            btcPriceForFV,
             market.strikePrice,
             tick.timeRemainingMs / 1000,
-            tick.vol
+            adjustedVol
         );
 
-        const fv = side === 'YES' ? worstCaseFV.pUp : worstCaseFV.pDown;
+        const fv = side === 'YES' ? recalcFV.pUp : recalcFV.pDown;
         const buyPrice = this.orderMatcher.getBuyPrice(midPrice);
         const edge = fv - buyPrice;
 
@@ -343,20 +439,29 @@ export class Simulator {
             this.config.maxPositionPerMarket
         )) return;
 
-        // Calculate execution timestamp with latency
-        const executionTs = tick.timestamp + this.config.executionLatencyMs;
+        // Calculate execution timestamp with effective latency (mode-adjusted)
+        const executionTs = tick.timestamp + this.effectiveLatencyMs;
 
         // Skip if execution would be too close to market end
         if (executionTs >= market.endTime - 30000) return;
 
-        // Get kline at execution time (may differ from decision-time kline)
-        let execBtcPrice = worstCaseBtc;
-        if (this.config.executionLatencyMs > 0 && this.currentKlines.length > 0) {
+        // Get BTC price at execution time
+        let execBtcPrice = btcPriceForFV;
+        if (this.effectiveLatencyMs > 0 && this.currentKlines.length > 0) {
             const execKlineIdx = this.getKlineIndex(this.currentKlines, executionTs);
             const execKline = this.currentKlines[execKlineIdx];
             if (execKline) {
-                // Use worst-case price from execution-time kline
-                execBtcPrice = side === 'YES' ? execKline.low : execKline.high;
+                // Use same pricing logic as decision time
+                let rawExecPrice: number;
+                if (this.useWorstCasePricing) {
+                    rawExecPrice = side === 'YES' ? execKline.low : execKline.high;
+                } else {
+                    rawExecPrice = execKline.close;
+                }
+                // Apply adjustment if using Binance
+                execBtcPrice = !this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0
+                    ? rawExecPrice + this.config.binanceChainlinkAdjustment
+                    : rawExecPrice;
             }
         }
 

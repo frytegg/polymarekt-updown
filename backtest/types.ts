@@ -145,6 +145,13 @@ export interface MarketResolution {
 // =============================================================================
 
 /**
+ * Backtest mode for easy switching between configurations
+ * - 'normal': Use close price, no latency (optimistic simulation)
+ * - 'conservative': Use worst-case pricing (kline low/high), 200ms latency
+ */
+export type BacktestMode = 'normal' | 'conservative';
+
+/**
  * Backtest configuration
  */
 export interface BacktestConfig {
@@ -157,6 +164,11 @@ export interface BacktestConfig {
     maxPositionPerMarket: number;  // Max shares per side per market
     lagSeconds: number;        // Lag between BTC price observation and Polymarket execution (default 0)
     executionLatencyMs: number;    // Simulated execution delay in ms (default: 0)
+    useChainlinkForFairValue: boolean;  // Use Chainlink instead of Binance for fair value calculation
+    volMultiplier: number;     // Multiplier for short-term vol adjustment (default: 1.0)
+    mode: BacktestMode;        // Easy toggle: 'normal' or 'conservative'
+    binanceChainlinkAdjustment: number;  // Adjustment to apply to Binance prices for fair value (default: 0)
+                                         // Set to -104 to correct for Chainlink being ~$104 lower than Binance
 }
 
 /**

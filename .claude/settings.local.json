@@ -10,7 +10,20 @@
       "Bash(powershell.exe -Command \"scoop install gh\")",
       "Bash(powershell.exe -Command \"gh --version\")",
       "Bash(powershell.exe -Command \"gh auth status\")",
-      "Bash(powershell.exe -Command \"gh repo list --limit 5\")"
+      "Bash(powershell.exe -Command \"gh repo list --limit 5\")",
+      "Bash(powershell.exe -Command \"npx ts-node backtest/index.ts --help\")",
+      "Bash(npm install:*)",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Utilisateur\\\\Documents\\\\1- Alexandre\\\\Coding\\\\Polymarket Bots\\\\btc_updown\\\\crypto-pricer''; npm install 2>&1\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Utilisateur\\\\Documents\\\\1- Alexandre\\\\Coding\\\\Polymarket Bots\\\\btc_updown\\\\crypto-pricer''; npx ts-node backtest/index.ts --days 3 --latency-ms 200 --edge 10 2>&1\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Utilisateur\\\\Documents\\\\1- Alexandre\\\\Coding\\\\Polymarket Bots\\\\btc_updown\\\\crypto-pricer''; npx ts-node backtest/index.ts --days 3 --latency-ms 200 --edge 15 2>&1\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Utilisateur\\\\Documents\\\\1- Alexandre\\\\Coding\\\\Polymarket Bots\\\\btc_updown\\\\crypto-pricer''; npx ts-node backtest/index.ts --days 3 --latency-ms 200 --edge 20 2>&1\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Utilisateur\\\\Documents\\\\1- Alexandre\\\\Coding\\\\Polymarket Bots\\\\btc_updown\\\\crypto-pricer''; npx ts-node backtest/index.ts --days 3 --latency-ms 200 --edge 25 2>&1\")",
+      "Bash(powershell.exe -Command \"npx ts-node backtest/index.ts --days 7 --edge 30 --latency-ms 200 --spread 1\")",
+      "Bash(powershell.exe -Command \"npx ts-node backtest/index.ts --days 7 --edge 35 --latency-ms 200 --spread 1\")",
+      "Bash(curl:*)",
+      "WebFetch(domain:data.chain.link)",
+      "Bash(npx ts-node:*)",
+      "Bash(ls:*)"
     ]
   }
 }

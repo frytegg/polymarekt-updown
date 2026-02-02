@@ -181,6 +181,30 @@ function loadFromCache(startTime: number, endTime: number): ChainlinkPricePoint[
       }
     }
 
+    // FALLBACK: Accept partial cache if it covers most of the range (within 4 hours)
+    // This handles cases where cache was created hours ago
+    const MAX_MISSING_MS = 4 * 60 * 60 * 1000; // 4 hours tolerance
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(DATA_DIR, file), 'utf-8');
+        const cached: CachedData<ChainlinkPricePoint> = JSON.parse(content);
+
+        // Check if cache covers start and mostly covers end
+        if (cached.metadata.startTs <= startTime &&
+            cached.metadata.endTs >= endTime - MAX_MISSING_MS) {
+          // Filter data within range
+          const filtered = cached.data.filter(p => p.timestamp >= startTime && p.timestamp <= endTime);
+          if (filtered.length > 0) {
+            console.log(`📦 Chainlink Cache HIT (partial, ${filtered.length} points): ${file}`);
+            return filtered;
+          }
+        }
+      } catch {
+        // Skip corrupted files
+      }
+    }
+
     // Try to merge multiple cache files for partial coverage
     const allPoints: Map<string, ChainlinkPricePoint> = new Map();
     let coverageStartDay = Infinity;
@@ -249,11 +273,79 @@ function saveToCache(startTime: number, endTime: number, data: ChainlinkPricePoi
 }
 
 // =============================================================================
+// INCREMENTAL FETCH HELPERS
+// =============================================================================
+
+interface CachedCoverage {
+  data: ChainlinkPricePoint[];
+  minTs: number;
+  maxTs: number;
+}
+
+/**
+ * Find the best cached data that overlaps with requested range
+ * Returns data and the time range it covers
+ */
+function findCachedCoverage(startTime: number, endTime: number): CachedCoverage | null {
+  try {
+    if (!fs.existsSync(DATA_DIR)) return null;
+
+    const files = fs.readdirSync(DATA_DIR).filter(f =>
+      f.startsWith('chainlink_BTC_') && f.endsWith('.json')
+    );
+
+    // Collect all points from overlapping cache files
+    const allPoints: Map<string, ChainlinkPricePoint> = new Map();
+    let coverageMin = Infinity;
+    let coverageMax = 0;
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(DATA_DIR, file), 'utf-8');
+        const cached: CachedData<ChainlinkPricePoint> = JSON.parse(content);
+
+        // Check if there's any overlap with our range
+        if (cached.metadata.endTs >= startTime && cached.metadata.startTs <= endTime) {
+          for (const p of cached.data) {
+            // Only add points within our requested range
+            if (p.timestamp >= startTime && p.timestamp <= endTime) {
+              allPoints.set(p.roundId, p);
+            }
+          }
+          // Track actual coverage from metadata
+          coverageMin = Math.min(coverageMin, cached.metadata.startTs);
+          coverageMax = Math.max(coverageMax, cached.metadata.endTs);
+        }
+      } catch {
+        // Skip corrupted files
+      }
+    }
+
+    if (allPoints.size === 0) return null;
+
+    const data = Array.from(allPoints.values()).sort((a, b) => a.timestamp - b.timestamp);
+
+    // Use actual data timestamps for more accurate coverage detection
+    const actualMin = data[0].timestamp;
+    const actualMax = data[data.length - 1].timestamp;
+
+    return {
+      data,
+      minTs: Math.min(coverageMin, actualMin),
+      maxTs: Math.max(coverageMax, actualMax),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// =============================================================================
 // MAIN FETCH FUNCTION
 // =============================================================================
 
 /**
- * Fetch historical Chainlink BTC/USD prices
+ * Fetch historical Chainlink BTC/USD prices with incremental caching
+ * Only fetches missing time ranges and merges with cached data
  *
  * @param startTime - Start timestamp in Unix ms
  * @param endTime - End timestamp in Unix ms
@@ -265,30 +357,110 @@ export async function fetchChainlinkPrices(
   endTime: number,
   useCache: boolean = true
 ): Promise<ChainlinkPricePoint[]> {
-  // Check cache first
+  // Check cache first for full coverage
   if (useCache) {
     const cached = loadFromCache(startTime, endTime);
     if (cached) {
-      console.log(`📦 Loaded ${cached.length} Chainlink prices from cache`);
+      console.log(`📦 Loaded ${cached.length} Chainlink prices from cache (full coverage)`);
       return cached;
     }
   }
 
+  // Check for partial cache coverage
+  const existingCoverage = useCache ? findCachedCoverage(startTime, endTime) : null;
+
+  if (existingCoverage) {
+    console.log(`📦 Found partial cache: ${existingCoverage.data.length} points covering ${new Date(existingCoverage.minTs).toISOString()} to ${new Date(existingCoverage.maxTs).toISOString()}`);
+
+    // Determine what gaps need to be fetched
+    const needFetchEnd = existingCoverage.maxTs < endTime;
+    const needFetchStart = existingCoverage.minTs > startTime;
+
+    // If cache covers everything, return it
+    if (!needFetchEnd && !needFetchStart) {
+      console.log(`📦 Cache fully covers requested range`);
+      return existingCoverage.data;
+    }
+
+    const allPoints: Map<string, ChainlinkPricePoint> = new Map();
+
+    // Add existing cached points
+    for (const p of existingCoverage.data) {
+      allPoints.set(p.roundId, p);
+    }
+
+    // Fetch missing end range (more recent data)
+    if (needFetchEnd) {
+      const gapStart = existingCoverage.maxTs;
+      const gapEnd = endTime;
+      console.log(`📡 Fetching missing END range: ${new Date(gapStart).toISOString()} to ${new Date(gapEnd).toISOString()}`);
+
+      const newPoints = await fetchChainlinkRange(gapStart, gapEnd, 'end');
+      for (const p of newPoints) {
+        allPoints.set(p.roundId, p);
+      }
+    }
+
+    // Fetch missing start range (older data) - less common
+    if (needFetchStart) {
+      const gapStart = startTime;
+      const gapEnd = existingCoverage.minTs;
+      console.log(`📡 Fetching missing START range: ${new Date(gapStart).toISOString()} to ${new Date(gapEnd).toISOString()}`);
+
+      const newPoints = await fetchChainlinkRange(gapStart, gapEnd, 'start');
+      for (const p of newPoints) {
+        allPoints.set(p.roundId, p);
+      }
+    }
+
+    // Combine and sort
+    const combined = Array.from(allPoints.values()).sort((a, b) => a.timestamp - b.timestamp);
+    console.log(`✅ Combined ${combined.length} Chainlink price points (${existingCoverage.data.length} cached + ${combined.length - existingCoverage.data.length} new)`);
+
+    // Save combined data to cache
+    if (useCache && combined.length > 0) {
+      saveToCache(startTime, endTime, combined);
+    }
+
+    return combined.filter(p => p.timestamp >= startTime && p.timestamp <= endTime);
+  }
+
+  // No cache at all - fetch entire range
   console.log(`📡 Fetching Chainlink prices from ${new Date(startTime).toISOString()} to ${new Date(endTime).toISOString()}`);
 
+  const prices = await fetchChainlinkRange(startTime, endTime, 'end');
+
+  // Save to cache
+  if (useCache && prices.length > 0) {
+    saveToCache(startTime, endTime, prices);
+  }
+
+  return prices;
+}
+
+/**
+ * Fetch a specific time range from Chainlink
+ * @param rangeStart - Start of range to fetch
+ * @param rangeEnd - End of range to fetch
+ * @param direction - 'end' to fetch from latest backwards, 'start' to stop at rangeEnd
+ */
+async function fetchChainlinkRange(
+  rangeStart: number,
+  rangeEnd: number,
+  direction: 'end' | 'start'
+): Promise<ChainlinkPricePoint[]> {
   const rpcUrl = getRpcUrl();
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
   const contract = new ethers.Contract(CHAINLINK_BTC_USD_POLYGON, CHAINLINK_ABI, provider);
 
   // Get decimals (should be 8 for BTC/USD)
-  const decimals = await withRetry(
+  const decimals: number = await withRetry(
     () => contract.decimals(),
     'Fetching decimals'
   );
-  const divisor = Math.pow(10, decimals);
 
   // Get latest round to start iteration
-  const latestRound = await withRetry(
+  const latestRound: any = await withRetry(
     () => contract.latestRoundData(),
     'Fetching latest round'
   );
@@ -298,21 +470,21 @@ export async function fetchChainlinkPrices(
 
   console.log(`   Latest round: ${currentRoundId.toString()} at ${new Date(latestTimestamp).toISOString()}`);
 
-  // If latest round is before our end time, we can only get data up to latest
-  if (latestTimestamp < startTime) {
-    console.log(`⚠️ Latest Chainlink data (${new Date(latestTimestamp).toISOString()}) is before requested start time`);
+  // If latest round is before our range start, nothing to fetch
+  if (latestTimestamp < rangeStart) {
+    console.log(`⚠️ Latest Chainlink data is before requested range`);
     return [];
   }
 
   const prices: ChainlinkPricePoint[] = [];
   let roundsFetched = 0;
   let consecutiveErrors = 0;
-  const maxConsecutiveErrors = 50; // Stop if we hit too many invalid rounds in a row
+  const maxConsecutiveErrors = 50;
 
   // Work backwards from latest round
   while (consecutiveErrors < maxConsecutiveErrors) {
     try {
-      const roundData = await withRetry(
+      const roundData: any = await withRetry(
         () => contract.getRoundData(currentRoundId),
         `Fetching round ${currentRoundId.toString()}`
       );
@@ -320,14 +492,14 @@ export async function fetchChainlinkPrices(
       const timestamp = roundData.updatedAt.toNumber() * 1000;
       const price = parseFloat(ethers.utils.formatUnits(roundData.answer, decimals));
 
-      // Stop if we've gone past our start time
-      if (timestamp < startTime) {
-        console.log(`   Reached start time at round ${currentRoundId.toString()}`);
+      // Stop if we've gone past our range start
+      if (timestamp < rangeStart) {
+        console.log(`   Reached range start at round ${currentRoundId.toString()}`);
         break;
       }
 
       // Only include rounds within our time range
-      if (timestamp <= endTime && timestamp >= startTime && price > 0) {
+      if (timestamp <= rangeEnd && timestamp >= rangeStart && price > 0) {
         prices.push({
           roundId: roundData.roundId.toString(),
           price,
@@ -336,7 +508,7 @@ export async function fetchChainlinkPrices(
       }
 
       roundsFetched++;
-      consecutiveErrors = 0; // Reset error counter on success
+      consecutiveErrors = 0;
 
       // Progress logging
       if (roundsFetched % 100 === 0) {
@@ -347,22 +519,16 @@ export async function fetchChainlinkPrices(
       await sleep(DELAY_BETWEEN_CALLS_MS);
 
     } catch (error: any) {
-      // Check if it's a revert (invalid round) - this is expected for gaps
       if (error.message?.includes('revert') || error.code === 'CALL_EXCEPTION') {
         consecutiveErrors++;
-        // Don't log every invalid round, just count them
       } else {
-        // Unexpected error - log it but continue
         console.log(`⚠️ Error at round ${currentRoundId.toString()}: ${error.message?.slice(0, 50)}`);
         consecutiveErrors++;
       }
     }
 
-    // Move to previous round
-    // Chainlink roundIds are not always sequential, but decrementing usually works
     currentRoundId = currentRoundId.sub(1);
 
-    // Safety check: don't go below 0
     if (currentRoundId.lte(0)) {
       console.log(`   Reached round 0`);
       break;
@@ -373,15 +539,8 @@ export async function fetchChainlinkPrices(
     console.log(`⚠️ Stopped after ${maxConsecutiveErrors} consecutive invalid rounds`);
   }
 
-  // Sort by timestamp ascending
   prices.sort((a, b) => a.timestamp - b.timestamp);
-
-  console.log(`✅ Fetched ${prices.length} Chainlink price points (${roundsFetched} rounds checked)`);
-
-  // Save to cache
-  if (useCache && prices.length > 0) {
-    saveToCache(startTime, endTime, prices);
-  }
+  console.log(`✅ Fetched ${prices.length} new Chainlink price points (${roundsFetched} rounds checked)`);
 
   return prices;
 }

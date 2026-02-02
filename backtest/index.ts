@@ -1,10 +1,10 @@
 #!/usr/bin/env npx ts-node
 /**
  * Crypto Pricer Arb - Backtest Entry Point
- * 
+ *
  * Usage:
  *   npx ts-node backtest/index.ts [options]
- * 
+ *
  * Options:
  *   --days <n>         Number of days to backtest (default: 7)
  *   --spread <cents>   Spread in cents (default: 1)
@@ -15,8 +15,11 @@
  *   --verbose          Show detailed logs
  */
 
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { Simulator } from './engine/simulator';
-import { BacktestConfig } from './types';
+import { BacktestConfig, BacktestMode } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
 import { printPnLCurve, printDrawdownAnalysis, exportPnLCurveToCsv } from './output/pnl-curve';
@@ -29,12 +32,17 @@ function parseArgs(): {
     size: number;
     maxPos: number;
     lag: number;
+    latencyMs: number;
+    volMultiplier: number;
+    mode: BacktestMode;
     export: boolean;
     verbose: boolean;
     sweep: boolean;
     sweepMin: number;
     sweepMax: number;
     sweepStep: number;
+    useChainlink: boolean;
+    adjustment: number;
 } {
     const args = process.argv.slice(2);
     const result = {
@@ -44,12 +52,17 @@ function parseArgs(): {
         size: 100,
         maxPos: 1000,
         lag: 0,
+        latencyMs: 0,
+        volMultiplier: 1.0,
+        mode: 'normal' as BacktestMode,
         export: false,
         verbose: false,
         sweep: false,
         sweepMin: 0,
         sweepMax: 30,
         sweepStep: 2,
+        useChainlink: false,
+        adjustment: 0,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -72,6 +85,12 @@ function parseArgs(): {
             case '--lag':
                 result.lag = parseInt(args[++i], 10) || 0;
                 break;
+            case '--latency-ms':
+                result.latencyMs = parseInt(args[++i], 10) || 0;
+                break;
+            case '--vol-mult':
+                result.volMultiplier = parseFloat(args[++i]) || 1.0;
+                break;
             case '--export':
                 result.export = true;
                 break;
@@ -89,6 +108,18 @@ function parseArgs(): {
                 break;
             case '--sweep-step':
                 result.sweepStep = parseFloat(args[++i]) || 2;
+                break;
+            case '--chainlink':
+                result.useChainlink = true;
+                break;
+            case '--adjustment':
+                result.adjustment = parseFloat(args[++i]) || 0;
+                break;
+            case '--conservative':
+                result.mode = 'conservative';
+                break;
+            case '--normal':
+                result.mode = 'normal';
                 break;
             case '--help':
             case '-h':
@@ -115,9 +146,23 @@ Options:
   --max-pos <n>      Maximum position per side per market (default: 1000)
   --lag <seconds>    Lag between BTC price and Polymarket execution (default: 0)
                      Simulates delay: see BTC at T-lag, trade Poly at T
+  --latency-ms <ms>  Execution latency in milliseconds (default: 0)
+                     Simulates delay: decide at T, execute at T+latency
+  --vol-mult <x>     Volatility multiplier for short-term adjustment (default: 1.0)
+                     Higher values = more conservative P(UP/DOWN) estimates
+  --chainlink        Use Chainlink for fair value calculation (default: Binance)
+                     Matches the oracle used for settlement
+  --adjustment <$>   Binance→Chainlink price adjustment in USD (default: 0)
+                     Set to -104 to correct for Chainlink being ~$104 lower than Binance
+                     Only applies when using Binance (not --chainlink mode)
+
+  --normal           Normal mode (default): close price, no latency
+  --conservative     Conservative mode: worst-case pricing (kline low/high), 200ms latency
+                     Use this to simulate more realistic execution conditions
+
   --export           Export results to CSV/JSON files
   --verbose          Show detailed trade and resolution logs
-  
+
   --sweep            Run edge sweep optimization (find optimal edge threshold)
   --sweep-min <pct>  Minimum edge to test (default: 0)
   --sweep-max <pct>  Maximum edge to test (default: 30)
@@ -153,6 +198,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
     const startDate = new Date(now.getTime() - args.days * 24 * 60 * 60 * 1000);
     
     console.log(`\n📋 Sweep Configuration:`);
+    console.log(`   Mode:        ${args.mode.toUpperCase()}`);
     console.log(`   Period:      ${args.days} days`);
     console.log(`   Spread:      ${args.spread}¢`);
     console.log(`   Edge Range:  ${args.sweepMin}% → ${args.sweepMax}% (step: ${args.sweepStep}%)`);
@@ -181,6 +227,11 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             orderSize: args.size,
             maxPositionPerMarket: args.maxPos,
             lagSeconds: args.lag,
+            executionLatencyMs: args.latencyMs,
+            volMultiplier: args.volMultiplier,
+            mode: args.mode,
+            useChainlinkForFairValue: args.useChainlink,
+            binanceChainlinkAdjustment: args.adjustment,
         };
         
         try {
@@ -296,15 +347,27 @@ async function main(): Promise<void> {
         orderSize: args.size,
         maxPositionPerMarket: args.maxPos,
         lagSeconds: args.lag,
+        executionLatencyMs: args.latencyMs,
+        useChainlinkForFairValue: args.useChainlink,
+        volMultiplier: args.volMultiplier,
+        mode: args.mode,
+        binanceChainlinkAdjustment: args.adjustment,
     };
 
     console.log('\n📋 Configuration:');
+    console.log(`   Mode:        ${args.mode.toUpperCase()}`);
     console.log(`   Period:      ${args.days} days (${startDate.toLocaleDateString()} - ${now.toLocaleDateString()})`);
     console.log(`   Spread:      ${args.spread}¢ (buy at mid + ${args.spread / 2}¢)`);
     console.log(`   Min Edge:    ${args.edge}%`);
     console.log(`   Order Size:  ${args.size} shares`);
     console.log(`   Max Pos:     ${args.maxPos} shares per side`);
     console.log(`   Lag:         ${args.lag}s`);
+    console.log(`   Latency:     ${args.latencyMs}ms${args.mode === 'conservative' ? ' (auto: 200ms)' : ''}`);
+    console.log(`   Vol Mult:    ${args.volMultiplier}x`);
+    console.log(`   FV Oracle:   ${args.useChainlink ? 'CHAINLINK' : 'BINANCE'}`);
+    if (!args.useChainlink && args.adjustment !== 0) {
+        console.log(`   Adjustment:  $${args.adjustment} (Binance→Chainlink correction)`);
+    }
 
     // Create and run simulator
     const simulator = new Simulator(config);
