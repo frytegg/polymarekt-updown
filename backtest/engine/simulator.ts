@@ -23,7 +23,7 @@ import { DeribitVolFetcher } from '../fetchers/deribit-vol';
 import { ChainlinkHistoricalFetcher, ChainlinkPricePoint } from '../fetchers/chainlink-historical';
 import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
-import { calculateFairValue } from '../../fair-value';
+import { BlackScholesStrategy } from '../../strategies';
 
 const DEFAULT_CONFIG: BacktestConfig = {
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -68,6 +68,7 @@ export class Simulator {
     private orderMatcher: OrderMatcher;
     private positionTracker: PositionTracker;
     private currentKlines: BinanceKline[] = [];
+    private strategy: BlackScholesStrategy;
 
     // Mode-derived settings
     private useWorstCasePricing: boolean = false;
@@ -78,6 +79,9 @@ export class Simulator {
 
         // Apply mode settings
         this.applyModeSettings();
+
+        // Initialize pricing strategy (Black-Scholes)
+        this.strategy = new BlackScholesStrategy();
 
         this.binanceFetcher = new BinanceHistoricalFetcher('BTCUSDT', '1m');
         this.marketsFetcher = new PolymarketMarketsFetcher();
@@ -366,8 +370,8 @@ export class Simulator {
         // Apply vol multiplier for short-term adjustment
         const adjustedVol = tick.vol * this.config.volMultiplier;
 
-        // Calculate fair value with adjusted volatility
-        const fairValue = calculateFairValue(
+        // Calculate fair value with selected strategy
+        const fairValue = this.strategy.calculateFairValue(
             tick.btcPrice,
             market.strikePrice,
             tick.timeRemainingMs / 1000, // Convert to seconds
@@ -416,8 +420,8 @@ export class Simulator {
         // Apply vol multiplier for short-term adjustment
         const adjustedVol = tick.vol * this.config.volMultiplier;
 
-        // Recalculate fair value with selected BTC price and adjusted vol
-        const recalcFV = calculateFairValue(
+        // Recalculate fair value with selected BTC price and adjusted vol using strategy
+        const recalcFV = this.strategy.calculateFairValue(
             btcPriceForFV,
             market.strikePrice,
             tick.timeRemainingMs / 1000,

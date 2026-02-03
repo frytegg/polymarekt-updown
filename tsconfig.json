@@ -20,7 +20,8 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "backtest/scripts"
   ],
   "ts-node": {
     "transpileOnly": true,

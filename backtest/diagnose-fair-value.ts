@@ -93,14 +93,14 @@ const fvSimple = calculateFairValueSimple(S, K, T_seconds, sigma);
 const fvAdjusted = calculateFairValue(S, K, T_seconds, sigma, true);
 
 console.log('\n📊 calculateFairValueSimple (no adjustments):');
-console.log(`   d:       ${fvSimple.d.toFixed(4)}`);
-console.log(`   sigmaT:  ${(fvSimple.sigmaT * 100).toFixed(4)}%`);
+console.log(`   d:       ${fvSimple.d?.toFixed(4) ?? 'N/A'}`);
+console.log(`   sigmaT:  ${fvSimple.sigmaT !== undefined ? (fvSimple.sigmaT * 100).toFixed(4) + '%' : 'N/A'}`);
 console.log(`   P(UP):   ${(fvSimple.pUp * 100).toFixed(2)}%`);
 console.log(`   P(DOWN): ${(fvSimple.pDown * 100).toFixed(2)}%`);
 
 console.log('\n📊 calculateFairValue (with adjustments):');
-console.log(`   d:       ${fvAdjusted.d.toFixed(4)}`);
-console.log(`   sigmaT:  ${(fvAdjusted.sigmaT * 100).toFixed(4)}%`);
+console.log(`   d:       ${fvAdjusted.d?.toFixed(4) ?? 'N/A'}`);
+console.log(`   sigmaT:  ${fvAdjusted.sigmaT !== undefined ? (fvAdjusted.sigmaT * 100).toFixed(4) + '%' : 'N/A'}`);
 console.log(`   P(UP):   ${(fvAdjusted.pUp * 100).toFixed(2)}%`);
 console.log(`   P(DOWN): ${(fvAdjusted.pDown * 100).toFixed(2)}%`);
 
@@ -108,9 +108,9 @@ console.log('\n' + '─'.repeat(70));
 console.log('  VERIFICATION');
 console.log('─'.repeat(70));
 
-const manualVsSimple = Math.abs(d2_manual - fvSimple.d);
+const manualVsSimple = fvSimple.d !== undefined ? Math.abs(d2_manual - fvSimple.d) : NaN;
 console.log(`\n✓ Manual d₂ matches function d? Diff = ${manualVsSimple.toExponential(4)}`);
-console.log(`  Manual: ${d2_manual.toFixed(6)}, Function: ${fvSimple.d.toFixed(6)}`);
+console.log(`  Manual: ${d2_manual.toFixed(6)}, Function: ${fvSimple.d?.toFixed(6) ?? 'N/A'}`);
 
 console.log('\n' + '═'.repeat(70));
 console.log('  VOLATILITY CHECK');
@@ -124,7 +124,7 @@ console.log('   ─────────────────────�
 for (const vol of [0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]) {
     const fv = calculateFairValueSimple(S, K, T_seconds, vol);
     const market50 = 0.50;
-    console.log(`   ${(vol * 100).toFixed(0).padStart(3)}%  | ${fv.d.toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}% | ${fv.pUp > 0.5 ? 'BUY YES' : 'SKIP'}`);
+    console.log(`   ${(vol * 100).toFixed(0).padStart(3)}%  | ${(fv.d ?? 0).toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}% | ${fv.pUp > 0.5 ? 'BUY YES' : 'SKIP'}`);
 }
 
 console.log('\n' + '═'.repeat(70));
@@ -138,7 +138,7 @@ console.log('   ─────────────────────�
 
 for (const mins of [15, 10, 5, 2, 1, 0.5, 0.1]) {
     const fv = calculateFairValueSimple(S, K, mins * 60, sigma);
-    console.log(`   ${mins.toFixed(1).padStart(4)} min | ${fv.d.toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}%`);
+    console.log(`   ${mins.toFixed(1).padStart(4)} min | ${(fv.d ?? 0).toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}%`);
 }
 
 console.log('\n' + '═'.repeat(70));
@@ -154,7 +154,7 @@ for (const dist of [-500, -200, -100, -50, 0, 50, 100, 200, 500]) {
     const strike = S + dist;
     const fv = calculateFairValueSimple(S, strike, T_seconds, sigma);
     const distStr = dist >= 0 ? `+${dist}` : `${dist}`;
-    console.log(`   $${strike.toLocaleString().padEnd(6)} | ${distStr.padStart(5)} | ${fv.d.toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}%`);
+    console.log(`   $${strike.toLocaleString().padEnd(6)} | ${distStr.padStart(5)} | ${(fv.d ?? 0).toFixed(3).padStart(6)} | ${(fv.pUp * 100).toFixed(1).padStart(5)}%`);
 }
 
 console.log('\n' + '═'.repeat(70));
@@ -198,7 +198,7 @@ console.log('═'.repeat(70));
 console.log('\nSolving: What vol gives P(UP) = 50% when S > K by $100?');
 for (const vol of [1.0, 1.5, 2.0, 2.5, 3.0]) {
     const fv = calculateFairValueSimple(88000, 87900, 900, vol);
-    console.log(`   Vol=${(vol * 100).toFixed(0)}%: d=${fv.d.toFixed(3)}, P(UP)=${(fv.pUp * 100).toFixed(1)}%`);
+    console.log(`   Vol=${(vol * 100).toFixed(0)}%: d=${(fv.d ?? 0).toFixed(3)}, P(UP)=${(fv.pUp * 100).toFixed(1)}%`);
 }
 
 console.log('\n💡 To get P(UP) = 50% when $100 ITM, need d₂ = 0');

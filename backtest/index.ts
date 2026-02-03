@@ -167,13 +167,14 @@ Options:
   --sweep-min <pct>  Minimum edge to test (default: 0)
   --sweep-max <pct>  Maximum edge to test (default: 30)
   --sweep-step <pct> Step size for edge sweep (default: 2)
-  
+
   --help, -h         Show this help message
 
 Examples:
   npx ts-node backtest/index.ts --days 14 --spread 8 --edge 10 --lag 30
   npx ts-node backtest/index.ts --days 7 --spread 6 --edge 5 --lag 10 --size 10 --export --verbose
   npx ts-node backtest/index.ts --days 7 --sweep --sweep-min 0 --sweep-max 30 --sweep-step 2
+  npx ts-node backtest/index.ts --days 14 --adjustment -104 --conservative
 `);
 }
 

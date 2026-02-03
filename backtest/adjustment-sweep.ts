@@ -39,12 +39,14 @@ function parseArgs(): {
   days: number;
   edge: number;
   spread: number;
+  adjustments: number[];
 } {
   const args = process.argv.slice(2);
   const result = {
     days: 7,
     edge: 10,
     spread: 1,
+    adjustments: [] as number[],
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -58,7 +60,16 @@ function parseArgs(): {
       case '--spread':
         result.spread = parseFloat(args[++i]) || 1;
         break;
+      case '--adjustments':
+        // Parse comma-separated list: -150,-175,-200
+        result.adjustments = args[++i].split(',').map(s => parseFloat(s.trim()));
+        break;
     }
+  }
+
+  // Default adjustments if not specified
+  if (result.adjustments.length === 0) {
+    result.adjustments = [0, -50, -75, -100, -104, -120, -150];
   }
 
   return result;
@@ -110,8 +121,8 @@ async function main(): Promise<void> {
   console.log(`   Spread:     ${args.spread}¢`);
   console.log(`   Oracle:     BINANCE (with adjustment)`);
 
-  // Test these adjustment values
-  const adjustments = [0, -50, -75, -100, -104, -120, -150];
+  // Use adjustments from args
+  const adjustments = args.adjustments;
 
   console.log(`\n🔄 Testing ${adjustments.length} adjustment values...\n`);
 

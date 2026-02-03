@@ -31,10 +31,12 @@ export interface OrderBookState {
 }
 
 export interface FairValue {
-  pUp: number;      // Probability of UP (0-1)
-  pDown: number;    // Probability of DOWN (0-1)
-  d: number;        // d value from Black-Scholes
-  sigmaT: number;   // σ√τ
+  pUp: number;        // Probability of UP (0-1)
+  pDown: number;      // Probability of DOWN (0-1)
+  d?: number;         // BS: d₂ value from Black-Scholes
+  sigmaT?: number;    // BS: σ√τ
+  logit?: number;     // LJD: current logit value
+  beliefVol?: number; // LJD: calibrated σ_b
 }
 
 export interface TradeSignal {

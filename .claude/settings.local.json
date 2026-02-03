@@ -23,7 +23,10 @@
       "Bash(curl:*)",
       "WebFetch(domain:data.chain.link)",
       "Bash(npx ts-node:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node -e:*)",
+      "Bash(tee:*)",
+      "Bash(grep:*)"
     ]
   }
 }

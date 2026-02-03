@@ -71,10 +71,10 @@ export interface AlignedTick {
  * Fair value calculation result
  */
 export interface FairValue {
-    pUp: number;      // Probability of UP (0-1)
-    pDown: number;    // Probability of DOWN (0-1)
-    d: number;        // d value from Black-Scholes
-    sigmaT: number;   // σ√τ
+    pUp: number;        // Probability of UP (0-1)
+    pDown: number;      // Probability of DOWN (0-1)
+    d: number;          // d₂ value from Black-Scholes
+    sigmaT: number;     // σ√τ
 }
 
 /**
