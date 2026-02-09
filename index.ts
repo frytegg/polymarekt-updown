@@ -9,7 +9,6 @@
 
 import * as dotenv from 'dotenv';
 import { RealTimeDataClient } from '@polymarket/real-time-data-client';
-import { Chain } from '@polymarket/clob-client';
 
 import { loadArbConfig, validateArbConfig, logArbConfig, ArbConfig } from './config';
 import { BinanceWebSocket } from './binance-ws';
@@ -18,20 +17,18 @@ import { ArbTrader } from './arb-trader';
 import { CryptoMarket, OrderBookState } from './types';
 import { OrderbookService, getDefaultOrderBookState } from './orderbook-service';
 import { ResolutionTracker } from './resolution-tracker';
+import { TradingService } from './trading-service';
+import { divergenceTracker } from './divergence-tracker';
+import { paperTracker } from './paper-trading-tracker';
+import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './telegram';
 
-// Reuse existing services
-import { TradingService } from '../src/services/TradingService';
-import { MarketService } from '../src/services/MarketService';
-import { ApiKeyManager, getApiConfig } from '../src/infrastructure/ApiKeyManager';
-
-dotenv.config({ path: '.env.aggressive' });
+dotenv.config();
 
 class CryptoPricerArb {
   private config: ArbConfig;
   private binanceWs: BinanceWebSocket;
   private polymarketWs: RealTimeDataClient | null = null;
   private tradingService: TradingService;
-  private marketService: MarketService;
   private orderbookService: OrderbookService;
   private resolutionTracker: ResolutionTracker;
   private trader: ArbTrader;
@@ -39,6 +36,10 @@ class CryptoPricerArb {
   private isRunning = false;
   private lastMarketSearch = 0;
   private marketSearchCooldown = 10000; // 10 seconds minimum between searches
+  private divergenceStatusInterval: ReturnType<typeof setInterval> | null = null;
+  private paperTradingSummaryInterval: ReturnType<typeof setInterval> | null = null;
+  private startTime: number = 0; // Track startup time for runtime calculation
+  private lastOrderBook: OrderBookState | null = null; // Persisted orderbook state
 
   constructor() {
     // Load and validate config
@@ -46,15 +47,7 @@ class CryptoPricerArb {
     validateArbConfig(this.config);
 
     // Initialize services
-    const apiConfig = getApiConfig();
-    const apiKeyManager = ApiKeyManager.getInstance(apiConfig);
-
-    this.tradingService = new TradingService(apiKeyManager);
-    this.marketService = new MarketService(
-      this.config.clobHost,
-      this.config.chainId as Chain,
-      { minVolume: 0, minCumulativeVolume: 0, minSpread: 0, maxCumulativeBid: 1 }
-    );
+    this.tradingService = new TradingService();
     this.orderbookService = new OrderbookService(this.config.clobHost);
     this.resolutionTracker = new ResolutionTracker();
 
@@ -62,18 +55,50 @@ class CryptoPricerArb {
     this.binanceWs = new BinanceWebSocket('btcusdt');
 
     // Initialize trader
-    this.trader = new ArbTrader(this.config, this.tradingService, this.marketService);
+    this.trader = new ArbTrader(this.config, this.tradingService);
   }
 
   async start(): Promise<void> {
     console.log('\n🎯 CRYPTO PRICER ARB - Starting...\n');
     logArbConfig(this.config);
 
+    // Track start time for runtime calculation
+    this.startTime = Date.now();
+
+    // Initialize Telegram notifications
+    initTelegram();
+    if (isTelegramEnabled()) {
+      console.log('[System] Telegram notifications enabled');
+    }
+
     // Initialize trading service
     await this.tradingService.initialize();
 
     // Initialize volatility service (fetches Binance klines + Deribit data, starts refresh loop)
     await this.trader.initVol();
+
+    // Start divergence tracker for adaptive EMA adjustment (backtest: +64% P&L vs static)
+    divergenceTracker.start();
+    console.log('[System] Divergence tracker started (EMA 2h window, 30min half-life)');
+
+    // Log divergence tracker status every 5 minutes
+    this.divergenceStatusInterval = setInterval(() => {
+      if (!divergenceTracker.hasReliableData()) {
+        const stats = divergenceTracker.getStats();
+        console.log(`[DivergenceTracker] Warming up... ${stats.count}/30 points`);
+      } else {
+        const stats = divergenceTracker.getStats();
+        console.log(`[DivergenceTracker] Points: ${stats.count}, Mean: $${stats.mean.toFixed(0)}, EMA Adj: $${divergenceTracker.getEmaAdjustment().toFixed(0)}`);
+      }
+    }, 5 * 60 * 1000);
+
+    // Paper trading: print summary every 15 minutes
+    if (this.config.paperTrading) {
+      console.log('[System] Paper trading mode enabled - trades will be simulated');
+      this.paperTradingSummaryInterval = setInterval(() => {
+        paperTracker.printSummary();
+      }, 15 * 60 * 1000);
+    }
 
     // Find initial markets
     const markets = await findCryptoMarkets();
@@ -106,10 +131,16 @@ class CryptoPricerArb {
     this.startMarketRefreshLoop();
 
     console.log('\n✅ Strategy running. Press Ctrl+C to stop.\n');
+
+    // Send Telegram startup notification
+    notifyStartup().catch(() => {});
   }
 
   private startBinanceWs(): void {
     this.binanceWs.onPrice((price) => {
+      // Feed price to divergence tracker for adaptive adjustment
+      divergenceTracker.updateBinancePrice(price.price);
+
       this.trader.onBtcPriceUpdate(price);
 
       // Only check market switch if we have a market that's expiring
@@ -165,6 +196,8 @@ class CryptoPricerArb {
     console.log(`📡 Subscribed to market tokens: ${tokenIds[0].slice(0, 10)}..., ${tokenIds[1].slice(0, 10)}...`);
   }
 
+  private lastPriceChangeResync: number = 0; // Debounce REST resyncs to 1/sec
+
   private handlePolymarketMessage(message: any): void {
     try {
       if (!this.currentMarket) return;
@@ -173,36 +206,18 @@ class CryptoPricerArb {
       const { topic, type, payload } = message;
 
       // Format: clob_market / price_change
+      // Treat as a "poke" — trigger REST resync instead of directly updating the book
+      // price_change only gives last-trade price, which is not a reliable bid/ask
       if (topic === 'clob_market' && type === 'price_change') {
-        const { asset_id, price, side } = payload;
-
-        const isYes = asset_id === this.currentMarket.tokenIds[0];
-        const isNo = asset_id === this.currentMarket.tokenIds[1];
-
-        if (!isYes && !isNo) return;
-
-        const currentBook = this.getCurrentOrderBook();
-        const updatedBook: OrderBookState = {
-          ...currentBook,
-          timestamp: Date.now(),
-        };
-
-        const priceNum = parseFloat(price);
-
-        if (isYes) {
-          // price_change gives us the last price, use as approximation
-          updatedBook.yesAsk = priceNum;
-          updatedBook.yesBid = priceNum;
-        } else {
-          updatedBook.noAsk = priceNum;
-          updatedBook.noBid = priceNum;
+        const now = Date.now();
+        if (now - this.lastPriceChangeResync > 1000) {
+          this.lastPriceChangeResync = now;
+          this.refreshOrderbookFromClob();
         }
-
-        this.trader.onOrderBookUpdate(updatedBook);
         return;
       }
 
-      // Format: token / orderbook_updates
+      // Format: token / orderbook_updates — merge deltas into persisted book
       if (topic === 'token' && type === 'orderbook_updates') {
         const { token_id, buy, sell } = payload;
 
@@ -235,6 +250,8 @@ class CryptoPricerArb {
           updatedBook.noAskSize = askSize;
         }
 
+        // Persist and forward
+        this.lastOrderBook = updatedBook;
         this.trader.onOrderBookUpdate(updatedBook);
       }
 
@@ -244,8 +261,7 @@ class CryptoPricerArb {
   }
 
   private getCurrentOrderBook(): OrderBookState {
-    // Get default orderbook state
-    return getDefaultOrderBookState();
+    return this.lastOrderBook ?? getDefaultOrderBookState();
   }
 
   private async switchToNextMarket(): Promise<void> {
@@ -263,7 +279,9 @@ class CryptoPricerArb {
       if (stats.position.yesShares > 0 || stats.position.noShares > 0) {
         // Get trades for this market
         const marketTrades = this.trader.getAndClearCurrentMarketTrades();
-        
+
+        // Paper trading resolution is handled by the periodic checkAndResolveExpired() interval
+
         this.resolutionTracker.addPendingResolution({
           conditionId: this.currentMarket.conditionId,
           question: this.currentMarket.question.slice(0, 50),
@@ -296,6 +314,7 @@ class CryptoPricerArb {
     }
 
     this.currentMarket = nextMarket;
+    this.lastOrderBook = null; // Reset orderbook state for new market
     this.trader.setMarket(nextMarket);
     logMarket(nextMarket);
 
@@ -317,6 +336,7 @@ class CryptoPricerArb {
         this.currentMarket.tokenIds[0],
         this.currentMarket.tokenIds[1]
       );
+      this.lastOrderBook = orderBook; // Persist authoritative REST snapshot
       this.trader.onOrderBookUpdate(orderBook);
     } catch (err: any) {
       console.log(`⚠️ Failed to fetch CLOB orderbook: ${err.message}`);
@@ -348,6 +368,11 @@ class CryptoPricerArb {
 
     // Check for resolutions every 30 seconds
     setInterval(() => this.resolutionTracker.checkResolutions(), 30000);
+
+    // Paper trading: check and resolve expired positions every 30 seconds
+    if (this.config.paperTrading) {
+      setInterval(() => paperTracker.checkAndResolveExpired(), 30000);
+    }
   }
 
   /**
@@ -360,8 +385,9 @@ class CryptoPricerArb {
       this.currentMarket.tokenIds[0],
       this.currentMarket.tokenIds[1]
     );
-    
+
     if (orderBook) {
+      this.lastOrderBook = orderBook; // Persist authoritative REST snapshot
       this.trader.onOrderBookUpdate(orderBook);
     }
   }
@@ -372,6 +398,19 @@ class CryptoPricerArb {
 
     // Stop volatility service refresh loop
     this.trader.stopVol();
+
+    // Stop divergence tracker
+    divergenceTracker.stop();
+    if (this.divergenceStatusInterval) {
+      clearInterval(this.divergenceStatusInterval);
+      this.divergenceStatusInterval = null;
+    }
+
+    // Stop paper trading summary interval
+    if (this.paperTradingSummaryInterval) {
+      clearInterval(this.paperTradingSummaryInterval);
+      this.paperTradingSummaryInterval = null;
+    }
 
     this.binanceWs.disconnect();
     if (this.polymarketWs) {
@@ -386,11 +425,33 @@ class CryptoPricerArb {
     console.log(`   Total spent: $${stats.totalUsdSpent.toFixed(2)}`);
     console.log(`   Last BTC: $${stats.lastBtcPrice.toFixed(2)}`);
     console.log(`   Orders: ${stats.orderStats.success}✅ / ${stats.orderStats.failed}❌ | Avg latency: ${stats.orderStats.avgLatencyMs}ms`);
-    
+
+    // Log divergence tracker final stats
+    const divStats = divergenceTracker.getStats();
+    console.log(`   Divergence: ${divStats.count} points, Mean: $${divStats.mean.toFixed(0)}, EMA: $${divStats.ema.toFixed(0)}`);
+
     // Log final resolution stats
     if (this.resolutionTracker.getResolvedTradesCount() > 0) {
       this.resolutionTracker.logStats();
     }
+
+    // Paper trading: print final summary and send shutdown notification
+    if (this.config.paperTrading) {
+      const paperStats = paperTracker.getStats();
+      const runTimeMinutes = Math.round((Date.now() - this.startTime) / 60000);
+
+      // Send Telegram shutdown notification (fire and forget)
+      notifyShutdown({
+        totalTrades: paperStats.totalTrades,
+        realizedPnL: paperStats.realizedPnL,
+        runTimeMinutes,
+      }).catch(() => {});
+
+      paperTracker.printSummary();
+    }
+
+    // Stop Telegram bot polling
+    stopTelegram();
   }
 }
 

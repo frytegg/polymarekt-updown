@@ -106,7 +106,9 @@ export interface Trade {
     btcPrice: number;
     strike: number;
     timeRemainingMs: number;
-    cost: number;              // price * size
+    cost: number;              // price * size (without fee)
+    fee: number;               // Polymarket taker fee
+    totalCost: number;         // cost + fee (what you actually pay)
 }
 
 /**
@@ -152,6 +154,15 @@ export interface MarketResolution {
 export type BacktestMode = 'normal' | 'conservative';
 
 /**
+ * Adjustment method for Binance→Chainlink price correction
+ * - 'static': Use fixed adjustment value (binanceChainlinkAdjustment)
+ * - 'rolling-mean': Rolling mean of divergence over window
+ * - 'ema': Exponential moving average of divergence
+ * - 'median': Rolling median (robust to outliers)
+ */
+export type AdjustmentMethod = 'static' | 'rolling-mean' | 'ema' | 'median';
+
+/**
  * Backtest configuration
  */
 export interface BacktestConfig {
@@ -169,6 +180,13 @@ export interface BacktestConfig {
     mode: BacktestMode;        // Easy toggle: 'normal' or 'conservative'
     binanceChainlinkAdjustment: number;  // Adjustment to apply to Binance prices for fair value (default: 0)
                                          // Set to -104 to correct for Chainlink being ~$104 lower than Binance
+    adjustmentMethod: AdjustmentMethod;  // Method for calculating adjustment (default: 'static')
+    adjustmentWindowHours: number;       // Rolling window size in hours for adaptive methods (default: 2)
+    includeFees: boolean;      // Include Polymarket taker fees (15-min crypto markets)
+    cooldownMs: number;        // Minimum ms between trades per market+side (default: 60000)
+    maxTradesPerMarket: number; // Max total trades per market across both sides (default: 3)
+    maxOrderUsd: number;       // Max USD per order (default: Infinity = share-based only)
+    maxPositionUsd: number;    // Max USD per market position (default: Infinity = share-based only)
 }
 
 /**
@@ -182,6 +200,11 @@ export interface BacktestResult {
     totalTrades: number;
     totalPnL: number;
     totalVolume: number;       // Sum of all trade sizes * prices
+
+    // Fee statistics
+    totalFeesPaid: number;     // Total Polymarket taker fees paid
+    avgFeePerTrade: number;    // Average fee per trade
+    avgFeeRate: number;        // Average fee as percentage of trade cost
 
     // Performance metrics
     winRate: number;           // % of profitable trades
@@ -220,6 +243,11 @@ export interface Statistics {
     losingTrades: number;
     winRate: number;
 
+    // Fee statistics
+    totalFeesPaid: number;      // Total Polymarket taker fees paid
+    avgFeePerTrade: number;     // Average fee per trade
+    avgFeeRate: number;         // Average fee as percentage of trade cost
+
     // By side
     yesTrades: number;
     noTrades: number;
@@ -248,6 +276,7 @@ export interface Statistics {
     // Risk metrics
     sharpeRatio: number;
     sortinoRatio: number;
+    profitFactor: number;         // gross profit / gross loss
     maxDrawdown: number;
     maxDrawdownDuration: number;  // in ms
 

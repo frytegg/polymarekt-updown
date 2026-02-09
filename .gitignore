@@ -34,3 +34,15 @@ data/binance/*.json
 data/chainlink/*.json
 data/polymarket/*.json
 data/deribit/*.json
+
+# Runtime data (generated at runtime, not source)
+data/output/
+data/paper-trades/
+data/divergence-state.json
+
+# Reference market maker (local only, not part of this project)
+mm_example/
+
+#Claude Code
+.claude
+CLAUDE.md

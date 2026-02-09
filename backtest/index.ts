@@ -7,7 +7,7 @@
  *
  * Options:
  *   --days <n>         Number of days to backtest (default: 7)
- *   --spread <cents>   Spread in cents (default: 1)
+ *   --spread <cents>   Spread in cents (default: 6)
  *   --edge <pct>       Minimum edge percent (default: 2)
  *   --size <n>         Order size in shares (default: 100)
  *   --max-pos <n>      Max position per market (default: 1000)
@@ -19,7 +19,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 import { Simulator } from './engine/simulator';
-import { BacktestConfig, BacktestMode } from './types';
+import { BacktestConfig, BacktestMode, AdjustmentMethod } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
 import { printPnLCurve, printDrawdownAnalysis, exportPnLCurveToCsv } from './output/pnl-curve';
@@ -43,11 +43,18 @@ function parseArgs(): {
     sweepStep: number;
     useChainlink: boolean;
     adjustment: number;
+    adjustmentMethod: AdjustmentMethod;
+    adjustmentWindow: number;
+    fees: boolean;
+    cooldownMs: number;
+    maxTrades: number;
+    maxOrderUsd: number;
+    maxPositionUsd: number;
 } {
     const args = process.argv.slice(2);
     const result = {
         days: 7,
-        spread: 1,
+        spread: 6,
         edge: 2,
         size: 100,
         maxPos: 1000,
@@ -63,6 +70,13 @@ function parseArgs(): {
         sweepStep: 2,
         useChainlink: false,
         adjustment: 0,
+        adjustmentMethod: 'static' as AdjustmentMethod,
+        adjustmentWindow: 2,
+        fees: false,
+        cooldownMs: 60000,
+        maxTrades: 3,
+        maxOrderUsd: Infinity,
+        maxPositionUsd: Infinity,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -115,11 +129,38 @@ function parseArgs(): {
             case '--adjustment':
                 result.adjustment = parseFloat(args[++i]) || 0;
                 break;
+            case '--adjustment-method':
+                const method = args[++i] as AdjustmentMethod;
+                if (['static', 'rolling-mean', 'ema', 'median'].includes(method)) {
+                    result.adjustmentMethod = method;
+                } else {
+                    console.error(`Invalid adjustment method: ${method}. Use: static, rolling-mean, ema, median`);
+                    process.exit(1);
+                }
+                break;
+            case '--adjustment-window':
+                result.adjustmentWindow = parseFloat(args[++i]) || 2;
+                break;
             case '--conservative':
                 result.mode = 'conservative';
                 break;
             case '--normal':
                 result.mode = 'normal';
+                break;
+            case '--fees':
+                result.fees = true;
+                break;
+            case '--cooldown-ms':
+                result.cooldownMs = parseInt(args[++i], 10) || 60000;
+                break;
+            case '--max-trades':
+                result.maxTrades = parseInt(args[++i], 10) || 3;
+                break;
+            case '--max-order-usd':
+                result.maxOrderUsd = parseFloat(args[++i]) || Infinity;
+                break;
+            case '--max-position-usd':
+                result.maxPositionUsd = parseFloat(args[++i]) || Infinity;
                 break;
             case '--help':
             case '-h':
@@ -139,7 +180,7 @@ Usage: npx ts-node backtest/index.ts [options]
 
 Options:
   --days <n>         Number of days to backtest (default: 7)
-  --spread <cents>   Spread in cents to apply on trades (default: 1)
+  --spread <cents>   Spread in cents to apply on trades (default: 6)
                      Buy price = mid + spread/2 (e.g., --spread 8 = buy at mid + 4¢)
   --edge <pct>       Minimum edge percentage to trade (default: 2)
   --size <n>         Order size in shares per trade (default: 100)
@@ -155,10 +196,30 @@ Options:
   --adjustment <$>   Binance→Chainlink price adjustment in USD (default: 0)
                      Set to -104 to correct for Chainlink being ~$104 lower than Binance
                      Only applies when using Binance (not --chainlink mode)
+  --adjustment-method <method>
+                     Method for calculating adjustment (default: static)
+                     Options: static, rolling-mean, ema, median
+                     - static: Use fixed --adjustment value
+                     - rolling-mean: Rolling mean of Binance-Chainlink divergence
+                     - ema: Exponential moving average of divergence
+                     - median: Rolling median (robust to outliers)
+  --adjustment-window <hours>
+                     Rolling window size in hours for adaptive methods (default: 2)
 
   --normal           Normal mode (default): close price, no latency
   --conservative     Conservative mode: worst-case pricing (kline low/high), 200ms latency
                      Use this to simulate more realistic execution conditions
+
+  --fees             Include Polymarket taker fees (15-min crypto markets)
+                     Fee formula: shares × price × 0.25 × (price × (1 - price))²
+                     Typical rates: 1.56% @ 50¢, 1.10% @ 30¢, 0.64% @ 80¢
+
+  --cooldown-ms <ms> Minimum ms between trades per market+side (default: 60000)
+                     Prevents unrealistic trade density (1 trade/tick at 60s intervals)
+  --max-trades <n>   Maximum total trades per market across both sides (default: 3)
+                     Mirrors real liquidity constraints
+  --max-order-usd <$>  Maximum USD per order (default: unlimited)
+  --max-position-usd <$> Maximum USD per market position (default: unlimited)
 
   --export           Export results to CSV/JSON files
   --verbose          Show detailed trade and resolution logs
@@ -188,6 +249,7 @@ interface SweepResult {
     avgEdge: number;
     sharpe: number;
     roi: number;
+    totalFees: number;
 }
 
 async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
@@ -205,6 +267,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
     console.log(`   Edge Range:  ${args.sweepMin}% → ${args.sweepMax}% (step: ${args.sweepStep}%)`);
     console.log(`   Order Size:  ${args.size} shares`);
     console.log(`   Lag:         ${args.lag}s`);
+    console.log(`   Fees:        ${args.fees ? 'ENABLED' : 'DISABLED'}`);
     
     const results: SweepResult[] = [];
     const edgeValues: number[] = [];
@@ -233,8 +296,15 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             mode: args.mode,
             useChainlinkForFairValue: args.useChainlink,
             binanceChainlinkAdjustment: args.adjustment,
+            adjustmentMethod: args.adjustmentMethod,
+            adjustmentWindowHours: args.adjustmentWindow,
+            includeFees: args.fees,
+            cooldownMs: args.cooldownMs,
+            maxTradesPerMarket: args.maxTrades,
+            maxOrderUsd: args.maxOrderUsd,
+            maxPositionUsd: args.maxPositionUsd,
         };
-        
+
         try {
             const simulator = new Simulator(config);
             const result = await simulator.run();
@@ -249,10 +319,12 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
                 avgEdge: stats.avgEdgeAtTrade,
                 sharpe: stats.sharpeRatio,
                 roi: stats.avgRealizedEdge,
+                totalFees: result.totalFeesPaid,
             });
-            
+
             const pnlStr = result.totalPnL >= 0 ? `+$${result.totalPnL.toFixed(0)}` : `-$${Math.abs(result.totalPnL).toFixed(0)}`;
-            console.log(`${pnlStr} (${result.totalTrades} trades, ${(stats.winRate * 100).toFixed(0)}% win)`);
+            const feeStr = result.totalFeesPaid > 0 ? `, fees: $${result.totalFeesPaid.toFixed(0)}` : '';
+            console.log(`${pnlStr} (${result.totalTrades} trades, ${(stats.winRate * 100).toFixed(0)}% win${feeStr})`);
         } catch (err) {
             console.log(`ERROR`);
             results.push({
@@ -264,6 +336,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
                 avgEdge: 0,
                 sharpe: 0,
                 roi: 0,
+                totalFees: 0,
             });
         }
     }
@@ -353,6 +426,13 @@ async function main(): Promise<void> {
         volMultiplier: args.volMultiplier,
         mode: args.mode,
         binanceChainlinkAdjustment: args.adjustment,
+        adjustmentMethod: args.adjustmentMethod,
+        adjustmentWindowHours: args.adjustmentWindow,
+        includeFees: args.fees,
+        cooldownMs: args.cooldownMs,
+        maxTradesPerMarket: args.maxTrades,
+        maxOrderUsd: args.maxOrderUsd,
+        maxPositionUsd: args.maxPositionUsd,
     };
 
     console.log('\n📋 Configuration:');
@@ -366,9 +446,14 @@ async function main(): Promise<void> {
     console.log(`   Latency:     ${args.latencyMs}ms${args.mode === 'conservative' ? ' (auto: 200ms)' : ''}`);
     console.log(`   Vol Mult:    ${args.volMultiplier}x`);
     console.log(`   FV Oracle:   ${args.useChainlink ? 'CHAINLINK' : 'BINANCE'}`);
-    if (!args.useChainlink && args.adjustment !== 0) {
-        console.log(`   Adjustment:  $${args.adjustment} (Binance→Chainlink correction)`);
+    if (!args.useChainlink) {
+        if (args.adjustmentMethod === 'static') {
+            console.log(`   Adjustment:  STATIC ($${args.adjustment})`);
+        } else {
+            console.log(`   Adjustment:  ${args.adjustmentMethod.toUpperCase()} (${args.adjustmentWindow}h window, fallback: $${args.adjustment})`);
+        }
     }
+    console.log(`   Fees:        ${args.fees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
 
     // Create and run simulator
     const simulator = new Simulator(config);

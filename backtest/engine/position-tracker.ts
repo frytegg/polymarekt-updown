@@ -13,13 +13,15 @@ export class PositionTracker {
   private resolutions: MarketResolution[] = [];
   private allTrades: Trade[] = [];
   private pnlCurve: PnLPoint[] = [];
-  
+
   // Running totals
   private realizedPnL = 0;
   private totalCost = 0;
+  private totalFeesPaid = 0;
 
   /**
    * Record a trade and update position
+   * Uses totalCost (including fees) for P&L calculations
    */
   recordTrade(trade: Trade): void {
     this.allTrades.push(trade);
@@ -38,32 +40,32 @@ export class PositionTracker {
       this.positions.set(trade.marketId, position);
     }
 
-    // Update position based on trade
+    // Track fees
+    this.totalFeesPaid += trade.fee;
+
+    // Update position based on trade (use totalCost which includes fees)
     if (trade.action === 'BUY') {
       if (trade.side === 'YES') {
         position.yesShares += trade.size;
-        position.yesCost += trade.cost;
+        position.yesCost += trade.totalCost;
       } else {
         position.noShares += trade.size;
-        position.noCost += trade.cost;
+        position.noCost += trade.totalCost;
       }
-      this.totalCost += trade.cost;
+      this.totalCost += trade.totalCost;
     } else {
       // SELL
       if (trade.side === 'YES') {
         position.yesShares -= trade.size;
-        position.yesCost += trade.cost; // Negative cost for sells
+        position.yesCost += trade.totalCost; // Negative (net revenue after fee) for sells
       } else {
         position.noShares -= trade.size;
-        position.noCost += trade.cost;
+        position.noCost += trade.totalCost;
       }
-      this.totalCost += trade.cost; // Negative for sells
+      this.totalCost += trade.totalCost; // Negative for sells
     }
 
     position.trades.push(trade);
-
-    // Update P&L curve
-    this.updatePnLCurve(trade.timestamp);
   }
 
   /**
@@ -78,7 +80,8 @@ export class PositionTracker {
     marketId: string,
     outcome: 'UP' | 'DOWN',
     finalBtcPrice: number,
-    strikePrice: number
+    strikePrice: number,
+    resolutionTimestamp?: number
   ): MarketResolution | null {
     const position = this.positions.get(marketId);
     if (!position) {
@@ -115,6 +118,9 @@ export class PositionTracker {
 
     // Clear position (resolved)
     this.positions.delete(marketId);
+
+    // Update P&L curve on resolution (not on trade) so daily variance is accurate
+    this.updatePnLCurve(resolutionTimestamp ?? Date.now());
 
     return resolution;
   }
@@ -159,6 +165,13 @@ export class PositionTracker {
    */
   getRealizedPnL(): number {
     return this.realizedPnL;
+  }
+
+  /**
+   * Get total fees paid across all trades
+   */
+  getTotalFeesPaid(): number {
+    return this.totalFeesPaid;
   }
 
   /**
@@ -235,6 +248,7 @@ export class PositionTracker {
     openPositions: number;
     realizedPnL: number;
     totalCost: number;
+    totalFeesPaid: number;
   } {
     return {
       totalTrades: this.allTrades.length,
@@ -243,6 +257,7 @@ export class PositionTracker {
       openPositions: this.positions.size,
       realizedPnL: this.realizedPnL,
       totalCost: this.totalCost,
+      totalFeesPaid: this.totalFeesPaid,
     };
   }
 
@@ -256,6 +271,7 @@ export class PositionTracker {
     this.pnlCurve = [];
     this.realizedPnL = 0;
     this.totalCost = 0;
+    this.totalFeesPaid = 0;
   }
 }
 

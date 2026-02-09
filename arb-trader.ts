@@ -4,8 +4,7 @@
  */
 
 import { Side } from '@polymarket/clob-client';
-import { TradingService, OrderConfig } from '../src/services/TradingService';
-import { MarketService } from '../src/services/MarketService';
+import { TradingService, OrderConfig } from './trading-service';
 import { ArbConfig } from './config';
 import { CryptoMarket, OrderBookState, Position, TradeSignal, BinancePrice, FairValue } from './types';
 import { calculateFairValue, calculateEdge, formatFairValue } from './fair-value';
@@ -13,6 +12,8 @@ import { volatilityService } from './volatility-service';
 import { ExecutionMetricsTracker, ExecutionStats, TradeMetric } from './execution-metrics';
 import { PositionManager } from './position-manager';
 import { StrikePriceService } from './strike-service';
+import { divergenceTracker } from './divergence-tracker';
+import { paperTracker, calculatePolymarketFee } from './paper-trading-tracker';
 
 export class ArbTrader {
   // Position management (delegated)
@@ -54,8 +55,7 @@ export class ArbTrader {
 
   constructor(
     private config: ArbConfig,
-    private tradingService: TradingService,
-    private marketService: MarketService
+    private tradingService: TradingService
   ) {
     // Initialize position manager with limits from config
     this.positionManager = new PositionManager({
@@ -132,9 +132,15 @@ export class ArbTrader {
     // Check time remaining
     const now = Date.now();
     const secondsRemaining = (this.market.endDate.getTime() - now) / 1000;
-    
+
     if (secondsRemaining <= this.config.stopBeforeEndSec) {
       // Too close to resolution - stop trading
+      return;
+    }
+
+    // Staleness guard: skip trading if orderbook is older than 10 seconds
+    const bookAge = now - this.lastOrderBook.timestamp;
+    if (bookAge > 10_000) {
       return;
     }
 
@@ -172,10 +178,18 @@ export class ArbTrader {
     // Get volatility optimized for this time horizon
     const minutesRemaining = secondsRemaining / 60;
     const currentVol = volatilityService.getVolForHorizon(minutesRemaining);
-    
-    // Calculate fair value
+
+    // Apply Binance→Chainlink oracle adjustment using adaptive EMA
+    // EMA adjustment tracks real-time divergence (backtest shows 64% better P&L vs static)
+    // Falls back to static config.oracleAdjustment during warm-up period
+    const adjustment = divergenceTracker.hasReliableData()
+      ? divergenceTracker.getEmaAdjustment()
+      : this.config.oracleAdjustment;
+    const adjustedBtcPrice = this.lastBtcPrice + adjustment;
+
+    // Calculate fair value with adjusted price
     const fairValue = calculateFairValue(
-      this.lastBtcPrice,
+      adjustedBtcPrice,
       strikePrice,
       secondsRemaining,
       currentVol
@@ -257,7 +271,7 @@ export class ArbTrader {
   }
 
   /**
-   * Execute a trade
+   * Execute a trade (or simulate in paper trading mode)
    */
   private async executeTrade(signal: TradeSignal): Promise<void> {
     if (!this.market || this.isTrading) return;
@@ -268,16 +282,69 @@ export class ArbTrader {
     const btcPriceAtSignal = this.lastBtcPrice;
     this.lastTradeTime = signalTime;
 
-    const tokenId = signal.side === 'YES' 
-      ? this.market.tokenIds[0] 
+    const tokenId = signal.side === 'YES'
+      ? this.market.tokenIds[0]
       : this.market.tokenIds[1];
 
     // Apply slippage to guarantee fill (buy slightly higher)
     const slippageMultiplier = 1 + (this.config.slippageBps / 10000);
     let priceWithSlippage = signal.marketPrice * slippageMultiplier;
-    
+
     // Round to tick size (0.01) and cap at 0.99
     priceWithSlippage = Math.min(0.99, Math.round(priceWithSlippage * 100) / 100);
+
+    // ==================== PAPER TRADING MODE ====================
+    // Paper trading assumes 100% fill at slippage-adjusted price.
+    // Live FAK orders may partially fill or fail entirely.
+    // Paper results are intentionally optimistic for signal validation.
+    if (this.config.paperTrading) {
+      const fee = calculatePolymarketFee(signal.size, priceWithSlippage);
+      const adjustment = divergenceTracker.hasReliableData()
+        ? divergenceTracker.getEmaAdjustment()
+        : this.config.oracleAdjustment;
+
+      // Get time remaining for this market
+      const timeRemainingMs = this.market.endDate.getTime() - signalTime;
+
+      paperTracker.recordTrade({
+        timestamp: new Date(signalTime),
+        marketId: this.market.conditionId,
+        tokenId,
+        side: signal.side,
+        price: priceWithSlippage,
+        size: signal.size,
+        fairValue: signal.fairValue,
+        edge: signal.edge,
+        fee,
+        adjustment,
+        adjustmentMethod: divergenceTracker.hasReliableData() ? 'ema' : 'static',
+        btcPrice: btcPriceAtSignal,
+        strike: this.strikeService.getStrike() || this.market.strikePrice,
+        timeRemainingMs,
+        marketEndTime: this.market.endDate.getTime(),
+      });
+
+      // Record trade for resolution tracking (same as live)
+      this.currentMarketTrades.push({
+        side: signal.side,
+        price: priceWithSlippage,
+        size: signal.size,
+        fairValue: signal.fairValue,
+        expectedEdge: signal.fairValue - priceWithSlippage,
+        timestamp: signalTime,
+      });
+
+      // Update position via PositionManager (simulated)
+      this.positionManager.updatePosition(signal.side, signal.size, priceWithSlippage);
+
+      this.positionManager.logTotalSpent();
+      this.positionManager.logPosition();
+
+      // Release lock
+      this.isTrading = false;
+      return;
+    }
+    // ============================================================
 
     const orderConfig: OrderConfig = {
       tokenId,

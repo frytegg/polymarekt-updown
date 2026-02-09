@@ -42,7 +42,8 @@ export class PositionManager {
   private noCostBasis: number = 0;
   private totalUsdSpent: number = 0;
   private tradeCount: number = 0;
-  
+  private updating: boolean = false; // Guard against re-entrant async calls
+
   // Logging flags to avoid spam
   private globalLimitLogged: boolean = false;
   private positionLimitLogged: boolean = false;
@@ -59,6 +60,9 @@ export class PositionManager {
    * @returns Number of shares to buy (0 if blocked)
    */
   calculateOrderSize(price: number): number {
+    // Guard: if an updatePosition is in progress, return 0 to prevent double-counting
+    if (this.updating) return 0;
+
     const globalRemainingUsd = this.limits.maxTotalUsd - this.totalUsdSpent;
     
     // Check global USD limit first
@@ -116,8 +120,9 @@ export class PositionManager {
    * Update position after a successful trade
    */
   updatePosition(side: 'YES' | 'NO', size: number, price: number): void {
+    this.updating = true;
     const cost = size * price;
-    
+
     if (side === 'YES') {
       this.position.yesShares += size;
       this.yesCostBasis += cost;
@@ -125,10 +130,11 @@ export class PositionManager {
       this.position.noShares += size;
       this.noCostBasis += cost;
     }
-    
+
     this.position.totalShares = this.position.yesShares + this.position.noShares;
     this.totalUsdSpent += cost;
     this.tradeCount++;
+    this.updating = false;
   }
 
   /**

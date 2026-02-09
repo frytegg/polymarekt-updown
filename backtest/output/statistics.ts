@@ -9,7 +9,10 @@ import { Trade, MarketResolution, BacktestResult, Statistics, PnLPoint } from '.
  * Calculate full statistics from backtest result
  */
 export function calculateStatistics(result: BacktestResult): Statistics {
-  const { trades, resolutions, pnlCurve } = result;
+  const { trades, resolutions, pnlCurve, config } = result;
+
+  // Calculate test duration in days for Sharpe calculation
+  const testDurationDays = (config.endDate.getTime() - config.startDate.getTime()) / (24 * 60 * 60 * 1000);
 
   // Basic counts
   const totalTrades = trades.length;
@@ -31,6 +34,12 @@ export function calculateStatistics(result: BacktestResult): Statistics {
 
   // Total P&L
   const totalPnL = resolutions.reduce((sum, r) => sum + r.pnl, 0);
+
+  // Fee statistics
+  const totalFeesPaid = trades.reduce((sum, t) => sum + t.fee, 0);
+  const avgFeePerTrade = totalTrades > 0 ? totalFeesPaid / totalTrades : 0;
+  const totalCostWithoutFees = trades.reduce((sum, t) => sum + Math.abs(t.cost), 0);
+  const avgFeeRate = totalCostWithoutFees > 0 ? totalFeesPaid / totalCostWithoutFees : 0;
 
   // By side
   const yesTrades = trades.filter(t => t.side === 'YES').length;
@@ -109,9 +118,14 @@ export function calculateStatistics(result: BacktestResult): Statistics {
     ? losingTradeReturns.reduce((sum, t) => sum + t.fairValue, 0) / losingTradeReturns.length
     : 0;
 
-  // Risk metrics
-  const sharpeRatio = calculateSharpeRatio(resolutions);
-  const sortinoRatio = calculateSortinoRatio(resolutions);
+  // Risk metrics - use P&L curve for proper daily aggregation
+  const sharpeRatio = calculateSharpeFromPnLCurve(pnlCurve, testDurationDays, totalStaked);
+  const sortinoRatio = calculateSortinoFromPnLCurve(pnlCurve, testDurationDays, totalStaked);
+
+  // Profit Factor = gross profit / gross loss (simple interpretability)
+  const grossProfit = resolutions.filter(r => r.pnl > 0).reduce((sum, r) => sum + r.pnl, 0);
+  const grossLoss = Math.abs(resolutions.filter(r => r.pnl < 0).reduce((sum, r) => sum + r.pnl, 0));
+  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99 : 0;
   const { maxDrawdown, maxDrawdownDuration } = calculateDrawdownMetrics(pnlCurve);
 
   // Per market stats
@@ -128,6 +142,10 @@ export function calculateStatistics(result: BacktestResult): Statistics {
     winningTrades,
     losingTrades,
     winRate,
+    // Fee statistics
+    totalFeesPaid,
+    avgFeePerTrade,
+    avgFeeRate,
     yesTrades,
     noTrades,
     yesPnL,
@@ -149,6 +167,7 @@ export function calculateStatistics(result: BacktestResult): Statistics {
     // Risk metrics
     sharpeRatio,
     sortinoRatio,
+    profitFactor,
     maxDrawdown,
     maxDrawdownDuration,
     avgPnLPerMarket,
@@ -159,46 +178,94 @@ export function calculateStatistics(result: BacktestResult): Statistics {
 }
 
 /**
- * Calculate Sharpe ratio from market resolutions
- * Annualized based on 15-minute markets
+ * Extract daily P&L deltas from the P&L curve
+ * Shared helper for Sharpe and Sortino calculations
  */
-function calculateSharpeRatio(resolutions: MarketResolution[]): number {
-  if (resolutions.length < 2) return 0;
+function extractDailyPnL(pnlCurve: PnLPoint[]): number[] {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const startTime = pnlCurve[0].timestamp;
+  const endTime = pnlCurve[pnlCurve.length - 1].timestamp;
 
-  const returns = resolutions.map(r => r.pnl);
-  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-  
-  const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
-  const stdDev = Math.sqrt(variance);
+  const dailyPnL: number[] = [];
+  let prevDayEndPnL = 0;
 
-  if (stdDev === 0) return avgReturn > 0 ? Infinity : 0;
+  for (let dayStart = startTime; dayStart < endTime; dayStart += msPerDay) {
+    const dayEnd = dayStart + msPerDay;
 
-  // Annualize: ~35,040 15-minute periods per year
-  const periodsPerYear = 35040;
-  return (avgReturn / stdDev) * Math.sqrt(periodsPerYear);
+    // Find the last P&L point within this day
+    let dayEndPnL = prevDayEndPnL;
+    for (const point of pnlCurve) {
+      if (point.timestamp >= dayStart && point.timestamp < dayEnd) {
+        dayEndPnL = point.cumulativePnL;
+      } else if (point.timestamp >= dayEnd) {
+        break;
+      }
+    }
+
+    dailyPnL.push(dayEndPnL - prevDayEndPnL);
+    prevDayEndPnL = dayEndPnL;
+  }
+
+  return dailyPnL;
 }
 
 /**
- * Calculate Sortino ratio (only penalizes downside volatility)
+ * Calculate Sharpe ratio from P&L curve using absolute daily P&L
+ *
+ * Uses absolute daily P&L (not percentage returns) because capital is not
+ * continuously deployed — it's locked in 15-min markets with gaps between.
+ * Normalizing by totalStaked/days produces artificially high Sharpe ratios
+ * because the denominator is artificially large.
+ *
+ * Sharpe = (mean_daily_pnl / std_daily_pnl) * sqrt(252)
+ *
+ * @param pnlCurve - P&L curve from backtest (updates on resolutions only)
+ * @param _testDurationDays - Unused (kept for signature compatibility)
+ * @param _totalStaked - Unused (kept for signature compatibility)
  */
-function calculateSortinoRatio(resolutions: MarketResolution[]): number {
-  if (resolutions.length < 2) return 0;
+function calculateSharpeFromPnLCurve(pnlCurve: PnLPoint[], _testDurationDays: number, _totalStaked: number): number {
+  if (pnlCurve.length < 2) return 0;
 
-  const returns = resolutions.map(r => r.pnl);
-  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-  
-  // Only consider negative returns for downside deviation
-  const negativeReturns = returns.filter(r => r < 0);
-  if (negativeReturns.length === 0) return avgReturn > 0 ? Infinity : 0;
+  const dailyPnL = extractDailyPnL(pnlCurve);
+  if (dailyPnL.length < 2) return 0;
 
-  const downsideVariance = negativeReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / returns.length;
-  const downsideDeviation = Math.sqrt(downsideVariance);
+  const n = dailyPnL.length;
+  const avgDailyPnL = dailyPnL.reduce((a, b) => a + b, 0) / n;
+  const variance = dailyPnL.reduce((sum, p) => sum + Math.pow(p - avgDailyPnL, 2), 0) / (n - 1);
+  const stdDev = Math.sqrt(variance);
 
-  if (downsideDeviation === 0) return avgReturn > 0 ? Infinity : 0;
+  if (stdDev === 0) return avgDailyPnL > 0 ? 99 : 0;
 
-  // Annualize
-  const periodsPerYear = 35040;
-  return (avgReturn / downsideDeviation) * Math.sqrt(periodsPerYear);
+  // Annualize: Sharpe = (avg / std) * sqrt(252)
+  return (avgDailyPnL / stdDev) * Math.sqrt(252);
+}
+
+/**
+ * Calculate Sortino ratio from P&L curve (only penalizes downside)
+ * Uses absolute daily P&L (same rationale as Sharpe above)
+ *
+ * Downside deviation uses all N observations as denominator (not just
+ * the count of negative returns), which is the standard Sortino formula.
+ */
+function calculateSortinoFromPnLCurve(pnlCurve: PnLPoint[], _testDurationDays: number, _totalStaked: number): number {
+  if (pnlCurve.length < 2) return 0;
+
+  const dailyPnL = extractDailyPnL(pnlCurve);
+  if (dailyPnL.length < 2) return 0;
+
+  const n = dailyPnL.length;
+  const avgDailyPnL = dailyPnL.reduce((a, b) => a + b, 0) / n;
+
+  // Downside deviation - squared negative returns divided by total N
+  const negReturns = dailyPnL.filter(p => p < 0);
+  if (negReturns.length === 0) return avgDailyPnL > 0 ? 99 : 0;
+
+  const downsideVariance = negReturns.reduce((sum, p) => sum + Math.pow(p, 2), 0) / n;
+  const downsideStd = Math.sqrt(downsideVariance);
+
+  if (downsideStd === 0) return avgDailyPnL > 0 ? 99 : 0;
+
+  return (avgDailyPnL / downsideStd) * Math.sqrt(252);
 }
 
 /**
@@ -266,6 +333,16 @@ export function printStatistics(stats: Statistics): void {
   console.log(`   Total Markets:        ${stats.totalMarkets}`);
   console.log(`   Total Trades:         ${stats.totalTrades}`);
   console.log(`   Win Rate:             ${(stats.winRate * 100).toFixed(1)}% (${stats.winningTrades}W / ${stats.losingTrades}L)`);
+
+  // Fee statistics (only show if fees were paid)
+  if (stats.totalFeesPaid > 0) {
+    console.log('\n💸 Fee Statistics');
+    console.log('─'.repeat(60));
+    console.log(`   Total Fees Paid:      $${stats.totalFeesPaid.toFixed(2)}`);
+    console.log(`   Avg Fee/Trade:        $${stats.avgFeePerTrade.toFixed(4)}`);
+    console.log(`   Avg Fee Rate:         ${(stats.avgFeeRate * 100).toFixed(2)}%`);
+    console.log(`   P&L Before Fees:      $${(stats.totalPnL + stats.totalFeesPaid).toFixed(2)}`);
+  }
   
   // Per Market Stats
   console.log('\n📊 Per Market Stats');
@@ -311,6 +388,7 @@ export function printStatistics(stats: Statistics): void {
   console.log('─'.repeat(60));
   console.log(`   Sharpe Ratio:         ${stats.sharpeRatio.toFixed(2)}`);
   console.log(`   Sortino Ratio:        ${stats.sortinoRatio.toFixed(2)}`);
+  console.log(`   Profit Factor:        ${stats.profitFactor.toFixed(2)} (gross profit / gross loss)`);
   console.log(`   Max Drawdown:         $${stats.maxDrawdown.toFixed(2)}`);
   console.log(`   Max DD Duration:      ${(stats.maxDrawdownDuration / 60000).toFixed(0)} minutes`);
   

@@ -14,6 +14,7 @@ import {
     BinanceKline,
     PolymarketPricePoint,
     DeribitVolPoint,
+    AdjustmentMethod,
 } from '../types';
 
 import { BinanceHistoricalFetcher } from '../fetchers/binance-historical';
@@ -24,12 +25,13 @@ import { ChainlinkHistoricalFetcher, ChainlinkPricePoint } from '../fetchers/cha
 import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
 import { BlackScholesStrategy } from '../../strategies';
+import { DivergenceCalculator } from './divergence-calculator';
 
 const DEFAULT_CONFIG: BacktestConfig = {
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
     endDate: new Date(),
     initialCapital: Infinity, // Unlimited
-    spreadCents: 1,           // 1¢ spread
+    spreadCents: 6,           // 6¢ spread (3¢ per side, realistic for BTC Up/Down 15-min markets)
     minEdge: 0.02,            // 2% minimum edge
     orderSize: 100,           // 100 shares per order
     maxPositionPerMarket: 1000, // Max 1000 shares per side
@@ -39,6 +41,13 @@ const DEFAULT_CONFIG: BacktestConfig = {
     volMultiplier: 1.0,       // No vol adjustment by default
     mode: 'normal',           // Normal mode by default
     binanceChainlinkAdjustment: 0, // No adjustment by default (set to -104 for divergence correction)
+    adjustmentMethod: 'static', // Static adjustment by default
+    adjustmentWindowHours: 2,   // 2-hour rolling window for adaptive methods
+    includeFees: false,       // No fees by default
+    cooldownMs: 60000,        // 60s cooldown between trades per market+side (1 per tick)
+    maxTradesPerMarket: 3,    // Max 3 trades per market (mirrors real liquidity constraints)
+    maxOrderUsd: Infinity,    // No USD limit by default (use share-based limits)
+    maxPositionUsd: Infinity, // No USD position limit by default
 };
 
 /**
@@ -69,10 +78,15 @@ export class Simulator {
     private positionTracker: PositionTracker;
     private currentKlines: BinanceKline[] = [];
     private strategy: BlackScholesStrategy;
+    private divergenceCalculator: DivergenceCalculator | null = null;
 
     // Mode-derived settings
     private useWorstCasePricing: boolean = false;
     private effectiveLatencyMs: number = 0;
+
+    // Trade cooldown and limit tracking (per market)
+    private lastTradeTimestamp: Map<string, number> = new Map(); // key: marketId:side
+    private marketTradeCount: Map<string, number> = new Map();   // key: marketId
 
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -88,7 +102,10 @@ export class Simulator {
         this.pricesFetcher = new PolymarketPricesFetcher(1); // 1 minute fidelity
         this.volFetcher = new DeribitVolFetcher('BTC', 60);  // 1 minute resolution
         this.chainlinkFetcher = new ChainlinkHistoricalFetcher();
-        this.orderMatcher = new OrderMatcher({ spreadCents: this.config.spreadCents });
+        this.orderMatcher = new OrderMatcher({
+            spreadCents: this.config.spreadCents,
+            includeFees: this.config.includeFees,
+        });
         this.positionTracker = new PositionTracker();
     }
 
@@ -120,10 +137,20 @@ export class Simulator {
         console.log(`📦 Order Size: ${this.config.orderSize} shares | Max Position: ${this.config.maxPositionPerMarket}`);
         console.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)`);
         console.log(`🔗 Fair Value Oracle: ${this.config.useChainlinkForFairValue ? 'CHAINLINK' : 'BINANCE'}`);
-        if (!this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0) {
-            console.log(`📐 Binance→Chainlink Adjustment: $${this.config.binanceChainlinkAdjustment} (applied to Binance prices)`);
+        if (!this.config.useChainlinkForFairValue) {
+            if (this.config.adjustmentMethod === 'static') {
+                console.log(`📐 Adjustment Method: STATIC ($${this.config.binanceChainlinkAdjustment})`);
+            } else {
+                console.log(`📐 Adjustment Method: ${this.config.adjustmentMethod.toUpperCase()} (${this.config.adjustmentWindowHours}h window, fallback: $${this.config.binanceChainlinkAdjustment})`);
+            }
         }
-        console.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)\n`);
+        console.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)`);
+        console.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
+        console.log(`🔄 Cooldown: ${this.config.cooldownMs}ms | Max Trades/Market: ${this.config.maxTradesPerMarket}`);
+        if (this.config.maxOrderUsd < Infinity || this.config.maxPositionUsd < Infinity) {
+            console.log(`💵 USD Limits: Order=$${this.config.maxOrderUsd}, Position=$${this.config.maxPositionUsd}`);
+        }
+        console.log('');
 
         const startTs = this.config.startDate.getTime();
         const endTs = this.config.endDate.getTime();
@@ -131,6 +158,8 @@ export class Simulator {
         // Reset state
         this.positionTracker.reset();
         this.orderMatcher.reset();
+        this.lastTradeTimestamp.clear();
+        this.marketTradeCount.clear();
 
         // Step 1: Fetch all historical markets
         console.log('📡 Step 1: Fetching historical markets...');
@@ -157,6 +186,13 @@ export class Simulator {
         console.log('📡 Step 4: Fetching Chainlink oracle prices...');
         const chainlinkPrices = await this.chainlinkFetcher.fetch(startTs, endTs);
         console.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
+
+        // Step 4b: Initialize DivergenceCalculator if using adaptive adjustment
+        if (this.config.adjustmentMethod !== 'static' && !this.config.useChainlinkForFairValue) {
+            console.log('📊 Initializing DivergenceCalculator for adaptive adjustment...');
+            this.divergenceCalculator = new DivergenceCalculator(chainlinkPrices, btcKlines);
+            console.log('');
+        }
 
         // Step 5: Process each market
         console.log('⚙️ Step 5: Processing markets...\n');
@@ -250,12 +286,19 @@ export class Simulator {
             market.conditionId,
             outcome,
             finalBtcPrice,
-            market.strikePrice
+            market.strikePrice,
+            market.endTime
         );
     }
 
     /**
      * Align data from different sources into unified ticks
+     *
+     * IMPORTANT: Polymarket prices-history API returns last-trade price, which
+     * approximates the mid price. It is NOT the ask price. The actual ask you'd
+     * pay is mid + spread/2. This gap is modeled by the OrderMatcher via the
+     * `spreadCents` config parameter (default 6¢ = 3¢ per side). Use --spread
+     * to adjust for different liquidity assumptions.
      *
      * With lag: We see BTC price at T-lag, then trade on Polymarket at T
      * This simulates the delay between seeing an opportunity and executing
@@ -299,10 +342,12 @@ export class Simulator {
                 const chainlinkPoint = this.getChainlinkPriceAt(chainlinkPrices, btcTimestamp);
                 btcPrice = chainlinkPoint?.price ?? null;
             } else {
-                // Use Binance price (default) with optional adjustment
+                // Use Binance price (default) with adjustment
                 btcPrice = kline?.close ?? null;
-                if (btcPrice !== null && this.config.binanceChainlinkAdjustment !== 0) {
-                    btcPrice = btcPrice + this.config.binanceChainlinkAdjustment;
+                if (btcPrice !== null) {
+                    // Get adjustment based on method
+                    const adjustment = this.getAdjustmentAtTime(btcTimestamp);
+                    btcPrice = btcPrice + adjustment;
                 }
             }
 
@@ -361,6 +406,23 @@ export class Simulator {
     }
 
     /**
+     * Get the adjustment to apply at a given timestamp
+     * Uses DivergenceCalculator if available, otherwise static adjustment
+     */
+    private getAdjustmentAtTime(timestamp: number): number {
+        if (this.config.adjustmentMethod === 'static' || !this.divergenceCalculator) {
+            return this.config.binanceChainlinkAdjustment;
+        }
+
+        return this.divergenceCalculator.getAdjustment(
+            timestamp,
+            this.config.adjustmentMethod,
+            this.config.adjustmentWindowHours,
+            this.config.binanceChainlinkAdjustment
+        );
+    }
+
+    /**
      * Process a single tick - check for trading opportunities
      */
     private processTick(market: HistoricalMarket, tick: AlignedTick): void {
@@ -408,10 +470,13 @@ export class Simulator {
             const rawPrice = side === 'YES'
                 ? (tick.btcKline?.low ?? tick.btcPrice)
                 : (tick.btcKline?.high ?? tick.btcPrice);
-            // Apply Binance→Chainlink adjustment if using Binance
-            btcPriceForFV = !this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0
-                ? rawPrice + this.config.binanceChainlinkAdjustment
-                : rawPrice;
+            // Apply adjustment if using Binance (adaptive or static)
+            if (!this.config.useChainlinkForFairValue) {
+                const adjustment = this.getAdjustmentAtTime(tick.timestamp);
+                btcPriceForFV = rawPrice + adjustment;
+            } else {
+                btcPriceForFV = rawPrice;
+            }
         } else {
             // Normal mode: use close price (already adjusted in alignTicks)
             btcPriceForFV = tick.btcPrice;
@@ -435,7 +500,16 @@ export class Simulator {
         // Check if edge is sufficient
         if (edge < this.config.minEdge) return;
 
-        // Check position limits
+        // Check trade cooldown per market+side
+        const cooldownKey = `${market.conditionId}:${side}`;
+        const lastTradeTs = this.lastTradeTimestamp.get(cooldownKey) ?? 0;
+        if (tick.timestamp - lastTradeTs < this.config.cooldownMs) return;
+
+        // Check max trades per market (across both sides)
+        const marketTradeCount = this.marketTradeCount.get(market.conditionId) ?? 0;
+        if (marketTradeCount >= this.config.maxTradesPerMarket) return;
+
+        // Check position limits (share-based)
         if (!this.positionTracker.canTrade(
             market.conditionId,
             side,
@@ -462,15 +536,36 @@ export class Simulator {
                 } else {
                     rawExecPrice = execKline.close;
                 }
-                // Apply adjustment if using Binance
-                execBtcPrice = !this.config.useChainlinkForFairValue && this.config.binanceChainlinkAdjustment !== 0
-                    ? rawExecPrice + this.config.binanceChainlinkAdjustment
-                    : rawExecPrice;
+                // Apply adjustment if using Binance (adaptive or static)
+                if (!this.config.useChainlinkForFairValue) {
+                    const adjustment = this.getAdjustmentAtTime(executionTs);
+                    execBtcPrice = rawExecPrice + adjustment;
+                } else {
+                    execBtcPrice = rawExecPrice;
+                }
             }
         }
 
         // Time remaining from execution timestamp
         const execTimeRemainingMs = market.endTime - executionTs;
+
+        // Calculate effective order size (respect USD limits if set)
+        let effectiveSize = this.config.orderSize;
+        if (this.config.maxOrderUsd < Infinity) {
+            const maxSharesByUsd = Math.floor(this.config.maxOrderUsd / buyPrice);
+            effectiveSize = Math.min(effectiveSize, maxSharesByUsd);
+        }
+        if (this.config.maxPositionUsd < Infinity) {
+            const position = this.positionTracker.getPosition(market.conditionId);
+            const currentShares = position
+                ? (side === 'YES' ? position.yesShares : position.noShares)
+                : 0;
+            const currentPositionUsd = currentShares * buyPrice;
+            const remainingUsd = this.config.maxPositionUsd - currentPositionUsd;
+            const maxSharesByPosition = Math.floor(remainingUsd / buyPrice);
+            effectiveSize = Math.min(effectiveSize, maxSharesByPosition);
+        }
+        if (effectiveSize <= 0) return;
 
         // Create signal
         const signal: TradeSignal = {
@@ -480,7 +575,7 @@ export class Simulator {
             fairValue: fv,
             marketPrice: midPrice,
             edge,
-            size: this.config.orderSize,
+            size: effectiveSize,
         };
 
         // Execute trade - record execution-time BTC price
@@ -493,6 +588,10 @@ export class Simulator {
 
         // Record trade
         this.positionTracker.recordTrade(trade);
+
+        // Update cooldown and trade count tracking
+        this.lastTradeTimestamp.set(cooldownKey, tick.timestamp);
+        this.marketTradeCount.set(market.conditionId, marketTradeCount + 1);
     }
 
     /**
@@ -638,6 +737,12 @@ export class Simulator {
         const totalPnL = this.positionTracker.getRealizedPnL();
         const totalVolume = trades.reduce((sum, t) => sum + Math.abs(t.cost), 0);
 
+        // Fee statistics
+        const totalFeesPaid = this.positionTracker.getTotalFeesPaid();
+        const avgFeePerTrade = trades.length > 0 ? totalFeesPaid / trades.length : 0;
+        const totalCostWithoutFees = trades.reduce((sum, t) => sum + Math.abs(t.cost), 0);
+        const avgFeeRate = totalCostWithoutFees > 0 ? totalFeesPaid / totalCostWithoutFees : 0;
+
         // Win rate calculations
         const winningTrades = trades.filter(t => {
             // A trade is "winning" if the market resolved in favor of that side
@@ -661,8 +766,8 @@ export class Simulator {
         const expectedPnL = trades.reduce((sum, t) => sum + t.edge * t.size, 0);
         const realizedEdge = expectedPnL > 0 ? totalPnL / expectedPnL : 0;
 
-        // Sharpe ratio (simplified - daily returns would be better)
-        const sharpeRatio = this.calculateSharpeRatio(resolutions);
+        // Sharpe ratio is calculated properly in statistics.ts using daily P&L
+        const sharpeRatio = 0;
 
         // Max drawdown
         const maxDrawdown = this.calculateMaxDrawdown(pnlCurve);
@@ -673,6 +778,9 @@ export class Simulator {
             totalTrades: trades.length,
             totalPnL,
             totalVolume,
+            totalFeesPaid,
+            avgFeePerTrade,
+            avgFeeRate,
             winRate,
             marketWinRate,
             avgEdge,
@@ -695,6 +803,9 @@ export class Simulator {
             totalTrades: 0,
             totalPnL: 0,
             totalVolume: 0,
+            totalFeesPaid: 0,
+            avgFeePerTrade: 0,
+            avgFeeRate: 0,
             winRate: 0,
             marketWinRate: 0,
             avgEdge: 0,
@@ -705,25 +816,6 @@ export class Simulator {
             resolutions: [],
             pnlCurve: [],
         };
-    }
-
-    /**
-     * Calculate Sharpe ratio from market resolutions
-     */
-    private calculateSharpeRatio(resolutions: { pnl: number }[]): number {
-        if (resolutions.length < 2) return 0;
-
-        const returns = resolutions.map(r => r.pnl);
-        const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-
-        const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
-        const stdDev = Math.sqrt(variance);
-
-        if (stdDev === 0) return 0;
-
-        // Annualize (assuming 15-min markets, ~35,040 per year)
-        const marketsPerYear = 35040;
-        return (avgReturn / stdDev) * Math.sqrt(marketsPerYear);
     }
 
     /**
@@ -756,7 +848,10 @@ export class Simulator {
      */
     updateConfig(config: Partial<BacktestConfig>): void {
         this.config = { ...this.config, ...config };
-        this.orderMatcher.updateConfig({ spreadCents: this.config.spreadCents });
+        this.orderMatcher.updateConfig({
+            spreadCents: this.config.spreadCents,
+            includeFees: this.config.includeFees,
+        });
     }
 }
 

@@ -4,6 +4,9 @@
  */
 
 export interface ArbConfig {
+  // Trading mode
+  paperTrading: boolean;        // If true, simulate trades without executing on Polymarket
+
   // Trading thresholds
   edgeMinimum: number;          // Minimum edge to trade (e.g., 0.05 = 5¢)
   stopBeforeEndSec: number;     // Stop trading X seconds before resolution
@@ -21,12 +24,27 @@ export interface ArbConfig {
   // Strike price override (set manually from Polymarket "Price to Beat")
   manualStrike?: number;        // If set, use this instead of Binance price
 
+  /**
+   * Oracle Adjustment: Binance→Chainlink price correction
+   *
+   * Polymarket settles on Chainlink, but we use Binance for price discovery.
+   * The divergence varies from -50 to -150 depending on market conditions.
+   *
+   * Uses adaptive EMA via divergence-tracker.ts (live) or divergence-calculator.ts (backtest)
+   * Fallback: -104 (median observed divergence over 30 days)
+   */
+  oracleAdjustment: number;
+
   // Polymarket API
   clobHost: string;
   chainId: number;
   privateKey: string;
   funderAddress: string;
   signatureType: number;
+
+  // Telegram notifications
+  telegramBotToken: string;
+  telegramChatId: string;
 }
 
 export function loadArbConfig(): ArbConfig {
@@ -35,6 +53,8 @@ export function loadArbConfig(): ArbConfig {
   const manualStrike = manualStrikeEnv ? parseFloat(manualStrikeEnv) : undefined;
 
   return {
+    // Paper trading mode (PAPER_TRADING=true to enable)
+    paperTrading: process.env.PAPER_TRADING === 'true',
 
     // Trading thresholds
     edgeMinimum: parseFloat(process.env.ARB_EDGE_MIN || "0.2"),
@@ -53,18 +73,29 @@ export function loadArbConfig(): ArbConfig {
     // Manual strike override (from Polymarket "Price to Beat")
     manualStrike,
 
+    // Oracle adjustment: Binance→Chainlink price correction
+    // Chainlink is typically ~$104 lower than Binance (varies -50 to -150)
+    oracleAdjustment: parseFloat(process.env.ARB_ORACLE_ADJUSTMENT || "-104"),
+
     // Polymarket API (reuse from main .env)
     clobHost: process.env.CLOB_HOST || "https://clob.polymarket.com",
     chainId: parseInt(process.env.CHAIN_ID || "137"),
     privateKey: process.env.PRIVATE_KEY || "",
     funderAddress: process.env.FUNDER_ADDRESS || "",
     signatureType: parseInt(process.env.SIGNATURE_TYPE || "2"),
+
+    // Telegram notifications
+    telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
+    telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
   };
 }
 
 export function validateArbConfig(config: ArbConfig): void {
-  if (!config.privateKey || !config.funderAddress) {
-    throw new Error("PRIVATE_KEY and FUNDER_ADDRESS must be set in .env");
+  // Skip credential validation in paper trading mode
+  if (!config.paperTrading) {
+    if (!config.privateKey || !config.funderAddress) {
+      throw new Error("PRIVATE_KEY and FUNDER_ADDRESS must be set in .env (or use PAPER_TRADING=true)");
+    }
   }
 
   if (config.edgeMinimum < 0.01 || config.edgeMinimum > 0.99) {
@@ -74,6 +105,7 @@ export function validateArbConfig(config: ArbConfig): void {
 
 export function logArbConfig(config: ArbConfig): void {
   console.log(`\n📊 Arb Strategy Configuration:`);
+  console.log(`   Mode: ${config.paperTrading ? '📝 PAPER TRADING' : '💰 LIVE TRADING'}`);
   console.log(`   σ (vol): Deribit DVOL (live)`);
   console.log(`   Edge minimum: ${(config.edgeMinimum * 100).toFixed(0)}%`);
   console.log(`   Stop avant fin: ${config.stopBeforeEndSec}s`);
@@ -83,6 +115,7 @@ export function logArbConfig(config: ArbConfig): void {
   console.log(`   Max total exposure: $${config.maxTotalUsd}`);
   console.log(`   Max buy price: ${(config.maxBuyPrice * 100).toFixed(0)}¢`);
   console.log(`   Slippage: ${(config.slippageBps / 100).toFixed(1)}%`);
+  console.log(`   Oracle adjustment: $${config.oracleAdjustment} (Binance→Chainlink)`);
   console.log();
 }
 

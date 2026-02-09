@@ -13,6 +13,7 @@ export interface OrderMatcherConfig {
   slippageBps: number;     // Additional slippage in basis points (default 0)
   minPrice: number;        // Minimum tradeable price (default 0.01)
   maxPrice: number;        // Maximum tradeable price (default 0.99)
+  includeFees: boolean;    // Include Polymarket taker fees (default false)
 }
 
 const DEFAULT_CONFIG: OrderMatcherConfig = {
@@ -20,7 +21,28 @@ const DEFAULT_CONFIG: OrderMatcherConfig = {
   slippageBps: 0,
   minPrice: 0.01,
   maxPrice: 0.99,
+  includeFees: false,
 };
+
+/**
+ * Calculate Polymarket taker fee for 15-min crypto markets
+ *
+ * Formula from Polymarket docs:
+ * fee = shares × price × 0.25 × (price × (1 - price))²
+ *
+ * Examples:
+ * 100 shares @ $0.50 → fee = 100 * 0.50 * 0.25 * (0.50 * 0.50)² = $0.78 (1.56%)
+ * 100 shares @ $0.30 → fee = 100 * 0.30 * 0.25 * (0.30 * 0.70)² = $0.33 (1.10%)
+ * 100 shares @ $0.80 → fee = 100 * 0.80 * 0.25 * (0.80 * 0.20)² = $0.51 (0.64%)
+ *
+ * @param shares - Number of shares traded
+ * @param price - Execution price (0-1)
+ * @returns Fee in dollars
+ */
+export function calculatePolymarketFee(shares: number, price: number): number {
+  const feeMultiplier = 0.25 * Math.pow(price * (1 - price), 2);
+  return shares * price * feeMultiplier;
+}
 
 /**
  * Order Matcher - simulates trade execution with spread
@@ -76,6 +98,8 @@ export class OrderMatcher {
   ): Trade {
     const price = this.getBuyPrice(signal.marketPrice);
     const cost = price * signal.size;
+    const fee = this.config.includeFees ? calculatePolymarketFee(signal.size, price) : 0;
+    const totalCost = cost + fee;
 
     this.tradeCounter++;
 
@@ -93,6 +117,8 @@ export class OrderMatcher {
       strike,
       timeRemainingMs,
       cost,
+      fee,
+      totalCost,
     };
   }
 
@@ -107,6 +133,9 @@ export class OrderMatcher {
   ): Trade {
     const price = this.getSellPrice(signal.marketPrice);
     const cost = price * signal.size; // Negative cost = revenue
+    const fee = this.config.includeFees ? calculatePolymarketFee(signal.size, price) : 0;
+    // For sells: revenue = cost - fee (fee reduces what you get)
+    const totalCost = -cost + fee;
 
     this.tradeCounter++;
 
@@ -123,7 +152,9 @@ export class OrderMatcher {
       btcPrice,
       strike,
       timeRemainingMs,
-      cost: -cost, // Selling generates revenue
+      cost: -cost, // Selling generates revenue (before fee)
+      fee,
+      totalCost,   // Net revenue after fee
     };
   }
 
