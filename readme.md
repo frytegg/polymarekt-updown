@@ -1,6 +1,8 @@
-# Polymarket BTC Up/Down Arbitrage Bot
+# Polymarket BTC Up/Down Arbitrage Bot (Taker Only)
 
-Automated arbitrage strategy for Polymarket's 15-minute BTC Up/Down binary options markets. Exploits the pricing lag between Binance (price discovery) and Polymarket (retail sentiment) by computing Black-Scholes fair value in real time and buying mispriced YES/NO tokens.
+> **This is the taker-only FAK arbitrage bot.** For the market-making version (resting GTD orders + spread capture + maker rebates), see [polymarket_bs_market_making](https://github.com/frytegg/polymarket_bs_market_making).
+
+Automated arbitrage strategy for Polymarket's 15-minute BTC Up/Down binary options markets. Exploits the pricing lag between Binance (price discovery) and Polymarket (retail sentiment) by computing Black-Scholes fair value in real time and buying mispriced YES/NO tokens via Fill-and-Kill (FAK) orders.
 
 ## How It Works
 
