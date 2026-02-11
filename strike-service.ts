@@ -5,7 +5,7 @@
  * Supports Polymarket API (primary) and Chainlink on-chain (fallback).
  */
 
-import axios from 'axios';
+const axios = require('axios');
 import { ethers } from 'ethers';
 import { CryptoMarket } from './types';
 

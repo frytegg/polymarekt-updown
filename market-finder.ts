@@ -8,7 +8,7 @@
  * 3. GET /events/{id} → get full market details including clobTokenIds
  */
 
-import axios from 'axios';
+const axios = require('axios');
 import { CryptoMarket } from './types';
 
 const GAMMA_API_URL = 'https://gamma-api.polymarket.com';

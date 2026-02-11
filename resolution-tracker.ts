@@ -5,7 +5,7 @@
  * Sends Telegram notifications when markets resolve.
  */
 
-import axios from 'axios';
+const axios = require('axios');
 import { sendNotification } from './telegram';
 
 // =============================================================================

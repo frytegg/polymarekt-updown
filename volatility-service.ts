@@ -12,7 +12,7 @@
  * realized volatility is a better predictor than implied volatility.
  */
 
-import axios from 'axios';
+const axios = require('axios');
 
 // =============================================================================
 // TYPES

@@ -5,8 +5,8 @@
  * Falls back to REST polling if WebSocket is geo-blocked (HTTP 451)
  */
 
-import WebSocket from 'ws';
-import axios from 'axios';
+const WebSocket = require('ws');
+const axios = require('axios');
 import { BinancePrice, PriceCallback } from './types';
 
 // Try multiple endpoints in order of preference
