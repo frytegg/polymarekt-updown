@@ -3,7 +3,7 @@
  * Clean notifications + bot commands (/live-trades, /past-trades)
  */
 
-import TelegramBot from 'node-telegram-bot-api';
+import * as TelegramBot from 'node-telegram-bot-api';
 import { loadArbConfig, ArbConfig } from './config';
 import { paperTracker, PaperTrade, PaperStats, ResolutionRecord } from './paper-trading-tracker';
 
