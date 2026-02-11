@@ -83,8 +83,8 @@ class CryptoPricerArb {
         this.config.funderAddress,
         rpcUrl
       );
-      paperTracker.onRedemptionNeeded = (conditionId: string) => {
-        redemptionService.redeemPositions(conditionId).catch((err: any) => {
+      paperTracker.onRedemptionNeeded = (conditionId: string, yesTokenId?: string, noTokenId?: string) => {
+        redemptionService.redeemPositions(conditionId, yesTokenId, noTokenId).catch((err: any) => {
           console.log(`[Redemption] Async error: ${err.message?.slice(0, 80)}`);
         });
       };

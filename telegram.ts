@@ -159,12 +159,12 @@ function connectPaperTrackerCallbacks(): void {
 ${emoji} <b>TRADE #${trade.id} OPENED</b>
 
 <b>Side:</b> ${trade.side}
-<b>Price:</b> ${(trade.price * 100).toFixed(1)}¢ × ${trade.size} = $${trade.cost.toFixed(2)}
+<b>Price:</b> ${(trade.price * 100).toFixed(1)}¢ × ${trade.size} shares
+<b>Cost:</b> $${trade.cost.toFixed(2)} + $${trade.fee.toFixed(3)} fee = <b>$${trade.maxLoss.toFixed(2)}</b> at risk
 <b>Edge:</b> +${(trade.edge * 100).toFixed(1)}%
-<b>Fee:</b> $${trade.fee.toFixed(3)}
 
-<b>If WIN:</b> +$${trade.maxProfit.toFixed(2)}
-<b>If LOSE:</b> -$${trade.maxLoss.toFixed(2)}
+<b>If WIN:</b> +$${trade.maxProfit.toFixed(2)} (payout $${trade.size.toFixed(2)} - cost - fee)
+<b>If LOSE:</b> -$${trade.maxLoss.toFixed(2)} (cost + fee)
 
 <b>BTC:</b> $${trade.btcPrice.toFixed(0)} | Strike: $${trade.strike.toFixed(0)}
 <b>Adj:</b> $${trade.adjustment.toFixed(0)} (${adjMethod})

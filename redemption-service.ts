@@ -3,6 +3,10 @@
  *
  * Auto-redeems winning positions after market resolution via Gnosis Safe.
  * Calls NegRiskAdapter.redeemPositions() through the Safe's execTransaction.
+ *
+ * Key fix: redeemPositions requires actual token amounts [yesBalance, noBalance],
+ * NOT an empty array. We query CTF.balanceOf() for the Safe's on-chain balances.
+ *
  * No new dependencies — uses ethers.js (already installed).
  */
 
@@ -36,6 +40,13 @@ const NEG_RISK_ADAPTER_ABI = [
   'function redeemPositions(bytes32 conditionId, uint256[] amounts)',
 ];
 
+// Delay before attempting redemption (ms) — gives on-chain resolution time to finalize
+const REDEMPTION_DELAY_MS = 15_000;
+
+// Retry config
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 30_000;
+
 // =============================================================================
 // REDEMPTION SERVICE
 // =============================================================================
@@ -45,7 +56,6 @@ export class RedemptionService {
   private safeAddress: string;
   private safe: ethers.Contract;
   private ctf: ethers.Contract;
-  private negRiskAdapter: ethers.Contract;
   private approvalChecked = false;
 
   constructor(privateKey: string, funderAddress: string, rpcUrl: string) {
@@ -55,46 +65,83 @@ export class RedemptionService {
 
     this.safe = new ethers.Contract(funderAddress, SAFE_ABI, this.wallet);
     this.ctf = new ethers.Contract(CTF_ADDRESS, CTF_ABI, this.wallet);
-    this.negRiskAdapter = new ethers.Contract(NEG_RISK_ADAPTER, NEG_RISK_ADAPTER_ABI, this.wallet);
 
     console.log(`[Redemption] Initialized: Safe=${funderAddress.slice(0, 10)}... EOA=${this.wallet.address.slice(0, 10)}...`);
   }
 
   /**
    * Redeem positions for a resolved market.
-   * Queries token balances on the Safe, then calls NegRiskAdapter.redeemPositions
-   * through the Safe's execTransaction.
+   * Queries actual CTF token balances on the Safe, then calls
+   * NegRiskAdapter.redeemPositions([yesBalance, noBalance]) through Safe.
+   *
+   * @param conditionId - Market condition ID (bytes32)
+   * @param yesTokenId - CTF ERC-1155 token ID for YES outcome
+   * @param noTokenId - CTF ERC-1155 token ID for NO outcome
    */
-  async redeemPositions(conditionId: string): Promise<void> {
-    try {
-      console.log(`[Redemption] Attempting redemption for ${conditionId.slice(0, 18)}...`);
+  async redeemPositions(
+    conditionId: string,
+    yesTokenId?: string,
+    noTokenId?: string
+  ): Promise<void> {
+    // Wait for on-chain resolution to finalize
+    console.log(`[Redemption] Waiting ${REDEMPTION_DELAY_MS / 1000}s for on-chain finality...`);
+    await this.sleep(REDEMPTION_DELAY_MS);
 
-      // Ensure CTF approval for NegRiskAdapter (one-time)
-      await this.ensureApproval();
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[Redemption] Attempt ${attempt}/${MAX_RETRIES} for ${conditionId.slice(0, 18)}...`);
 
-      // Encode the NegRiskAdapter.redeemPositions call
-      // For negRisk binary markets, pass conditionId and empty amounts array
-      // The adapter redeems all tokens the caller (Safe) holds
-      const iface = new ethers.utils.Interface(NEG_RISK_ADAPTER_ABI);
-      const redeemData = iface.encodeFunctionData('redeemPositions', [
-        conditionId,
-        [], // empty amounts = redeem all
-      ]);
+        // Query actual on-chain balances for the Safe
+        const yesBalance = yesTokenId
+          ? await this.ctf.balanceOf(this.safeAddress, yesTokenId)
+          : ethers.BigNumber.from(0);
+        const noBalance = noTokenId
+          ? await this.ctf.balanceOf(this.safeAddress, noTokenId)
+          : ethers.BigNumber.from(0);
 
-      // Execute through Safe
-      const tx = await this.executeThroughSafe(NEG_RISK_ADAPTER, redeemData);
+        console.log(`[Redemption] Balances — YES: ${yesBalance.toString()} | NO: ${noBalance.toString()}`);
 
-      if (tx) {
-        const receipt = await tx.wait();
-        console.log(`[Redemption] TX confirmed: ${receipt.transactionHash} | Gas: ${receipt.gasUsed.toString()}`);
-        sendTelegramMessage(
-          `💰 <b>REDEEMED</b>\nMarket: ${conditionId.slice(0, 18)}...\nTX: ${receipt.transactionHash.slice(0, 18)}...`
-        ).catch(() => {});
+        if (yesBalance.isZero() && noBalance.isZero()) {
+          console.log(`[Redemption] No tokens to redeem (balances are zero)`);
+          return;
+        }
+
+        // Ensure CTF approval for NegRiskAdapter (one-time)
+        await this.ensureApproval();
+
+        // Encode the NegRiskAdapter.redeemPositions call
+        // amounts must be [yesBalance, noBalance] — NOT an empty array!
+        const iface = new ethers.utils.Interface(NEG_RISK_ADAPTER_ABI);
+        const redeemData = iface.encodeFunctionData('redeemPositions', [
+          conditionId,
+          [yesBalance, noBalance],
+        ]);
+
+        // Execute through Safe
+        const tx = await this.executeThroughSafe(NEG_RISK_ADAPTER, redeemData);
+
+        if (tx) {
+          const receipt = await tx.wait();
+          console.log(`[Redemption] TX confirmed: ${receipt.transactionHash} | Gas: ${receipt.gasUsed.toString()}`);
+          sendTelegramMessage(
+            `<b>REDEEMED</b>\nMarket: ${conditionId.slice(0, 18)}...\nYES: ${yesBalance.toString()} | NO: ${noBalance.toString()}\nTX: ${receipt.transactionHash.slice(0, 18)}...`
+          ).catch(() => {});
+          return; // Success — exit retry loop
+        }
+      } catch (err: any) {
+        const msg = err.message?.slice(0, 120) || 'Unknown error';
+        console.log(`[Redemption] Attempt ${attempt} failed: ${msg}`);
+
+        if (attempt < MAX_RETRIES) {
+          console.log(`[Redemption] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
+          await this.sleep(RETRY_DELAY_MS);
+        } else {
+          console.log(`[Redemption] All ${MAX_RETRIES} attempts failed`);
+          sendTelegramMessage(
+            `<b>Redemption failed</b>\n${conditionId.slice(0, 18)}...\n${msg}`
+          ).catch(() => {});
+        }
       }
-    } catch (err: any) {
-      const msg = err.message?.slice(0, 100) || 'Unknown error';
-      console.log(`[Redemption] Failed: ${msg}`);
-      sendTelegramMessage(`⚠️ <b>Redemption failed</b>\n${conditionId.slice(0, 18)}...\n${msg}`).catch(() => {});
     }
   }
 
@@ -176,5 +223,9 @@ export class RedemptionService {
     );
 
     return tx;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

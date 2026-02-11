@@ -132,7 +132,8 @@ class PaperTradingTracker {
   public onSummaryRequested?: (stats: PaperStats) => void;
 
   // Callback for on-chain redemption (set by index.ts in live mode)
-  public onRedemptionNeeded?: (conditionId: string) => void;
+  // Passes conditionId + both token IDs so RedemptionService can query CTF balances
+  public onRedemptionNeeded?: (conditionId: string, yesTokenId?: string, noTokenId?: string) => void;
 
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data', 'paper-trades');
@@ -240,9 +241,9 @@ class PaperTradingTracker {
 
     this.saveToFile();
 
-    // Trigger on-chain redemption (live mode)
+    // Trigger on-chain redemption (live mode) — pass token IDs for balance queries
     if (this.onRedemptionNeeded) {
-      this.onRedemptionNeeded(marketId);
+      this.onRedemptionNeeded(marketId, yesTokenId, noTokenId);
     }
   }
 
@@ -518,11 +519,10 @@ class PaperTradingTracker {
           const marketEndTime = pos.marketEndTime ?? associatedTrade?.marketEndTime ?? 0;
           const strike = pos.strike ?? associatedTrade?.strike ?? 0;
 
-          // Skip positions for markets that have already expired
+          // Keep expired positions — checkAndResolveExpired() will resolve them properly
+          // (Previously these were dropped on load, orphaning trades as permanently "open")
           if (marketEndTime > 0 && marketEndTime < now) {
-            console.log(`[TRACKER] Skipping expired position for market ending at ${new Date(marketEndTime).toISOString()}`);
-            skippedPositions++;
-            continue;
+            console.log(`[TRACKER] Keeping expired position for resolution (ended ${new Date(marketEndTime).toISOString()})`);
           }
 
           this.positions.set(pos.tokenId, {
@@ -597,42 +597,61 @@ class PaperTradingTracker {
           }
           this.saveToFile();
 
-          // Trigger on-chain redemption (live mode)
+          // Trigger on-chain redemption (live mode) — pass token IDs for balance queries
           if (this.onRedemptionNeeded) {
-            this.onRedemptionNeeded(pos.marketId);
+            this.onRedemptionNeeded(pos.marketId, yesPos?.tokenId, noPos?.tokenId);
           }
         }
       } catch (err: any) {
-        // Silently retry next cycle
+        console.log(`[TRACKER] Resolution check failed for ${pos.marketId.slice(0, 18)}...: ${err.message?.slice(0, 60)}`);
       }
     }
   }
 
   /**
-   * Fetch market outcome from Polymarket API
+   * Fetch market outcome from Polymarket CLOB API.
+   * Uses direct conditionId lookup (not slug-based search which was unreliable).
    */
   private async fetchMarketOutcome(conditionId: string): Promise<'UP' | 'DOWN' | null> {
     try {
+      // Direct lookup by conditionId — guaranteed to find the right market
       const response = await fetch(
-        `https://gamma-api.polymarket.com/events?slug=btc-up-or-down-15m&limit=100`
+        `https://clob.polymarket.com/markets/${conditionId}`
       );
-      const data = await response.json() as any[];
 
-      for (const event of data) {
-        for (const market of event.markets || []) {
-          if (market.conditionId === conditionId) {
-            if (market.closed && market.resolutionSource) {
-              const yesPrice = parseFloat(market.outcomePrices?.[0] || '0');
-              const noPrice = parseFloat(market.outcomePrices?.[1] || '0');
-              if (yesPrice > 0.9) return 'UP';
-              if (noPrice > 0.9) return 'DOWN';
-            }
-            return null; // Not resolved yet
-          }
-        }
+      if (!response.ok) {
+        console.log(`[TRACKER] Market lookup failed: HTTP ${response.status} for ${conditionId.slice(0, 18)}...`);
+        return null;
       }
+
+      const market = await response.json() as any;
+
+      // Not resolved yet
+      if (!market.closed && market.active !== false) return null;
+
+      // Check tokens[].winner field (most reliable)
+      const tokens = market.tokens || [];
+      if (tokens.length >= 2) {
+        if (tokens[0]?.winner === true) return 'UP';
+        if (tokens[1]?.winner === true) return 'DOWN';
+      }
+
+      // Fallback: check token prices after resolution
+      if (tokens.length >= 2) {
+        const yesPrice = parseFloat(tokens[0]?.price ?? '0');
+        const noPrice = parseFloat(tokens[1]?.price ?? '0');
+        if (yesPrice > 0.9) return 'UP';
+        if (noPrice > 0.9) return 'DOWN';
+      }
+
+      // Market is closed but outcome not determinable yet
+      if (market.closed) {
+        console.log(`[TRACKER] Market closed but outcome unclear: ${conditionId.slice(0, 18)}...`);
+      }
+
       return null;
-    } catch {
+    } catch (err: any) {
+      console.log(`[TRACKER] Resolution check error: ${err.message?.slice(0, 80)}`);
       return null;
     }
   }

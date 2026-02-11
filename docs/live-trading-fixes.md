@@ -121,12 +121,85 @@ console.log(`[TradingService] API Key: ${hasApiKey ? 'OK' : 'MISSING'} | Secret:
 
 **Integration**: Wire a callback from your resolution tracker:
 ```typescript
-tracker.onRedemptionNeeded = (conditionId: string) => {
-  redemptionService.redeemPositions(conditionId).catch(err => {
+tracker.onRedemptionNeeded = (conditionId: string, yesTokenId?: string, noTokenId?: string) => {
+  redemptionService.redeemPositions(conditionId, yesTokenId, noTokenId).catch(err => {
     console.log(`[Redemption] Error: ${err.message}`);
   });
 };
 ```
+
+---
+
+## 7. Redemption Requires Actual Token Amounts (Not Empty Array)
+
+**Symptom**: Redemption TX succeeds silently but no USDC returned. Manual redeem via UI still required.
+
+**Root cause**: `NegRiskAdapter.redeemPositions(conditionId, amounts)` requires `amounts` to be a **length-2 array** `[yesBalance, noBalance]` with actual on-chain CTF token balances. Passing `[]` (empty array) means `safeBatchTransferFrom` transfers nothing, so payout is zero.
+
+From the [NegRiskAdapter Solidity source](https://github.com/Polymarket/neg-risk-ctf-adapter/blob/main/src/NegRiskAdapter.sol):
+```solidity
+function redeemPositions(bytes32 _conditionId, uint256[] calldata _amounts) public {
+    uint256[] memory positionIds = Helpers.positionIds(address(wcol), _conditionId);
+    ctf.safeBatchTransferFrom(msg.sender, address(this), positionIds, _amounts, "");
+    // ...
+}
+```
+
+**Fix**: Query actual CTF balances before calling redeem, and pass token IDs through the callback:
+
+```typescript
+// Query on-chain balances for the Safe proxy wallet
+const yesBalance = yesTokenId
+  ? await ctf.balanceOf(safeAddress, yesTokenId)
+  : BigNumber.from(0);
+const noBalance = noTokenId
+  ? await ctf.balanceOf(safeAddress, noTokenId)
+  : BigNumber.from(0);
+
+// Pass actual amounts — NOT empty array!
+const redeemData = iface.encodeFunctionData('redeemPositions', [
+  conditionId,
+  [yesBalance, noBalance],  // was: []
+]);
+```
+
+Also added:
+- 15s delay before first attempt (on-chain resolution finality)
+- 3 retries with 30s spacing
+- Token IDs passed through `onRedemptionNeeded` callback
+
+---
+
+## 8. Resolution Tracking Never Resolves Trades (Slug-Based API Lookup)
+
+**Symptom**: `/stats` shows all trades as "open" with 0 resolved, even hours after markets closed. P&L stuck at $0.00.
+
+**Root cause (two bugs)**:
+
+**Bug A**: `fetchMarketOutcome()` searched the Gamma API by event slug (`btc-up-or-down-15m`). This slug doesn't match the actual event slugs, so the market is never found and outcome is always `null`. Positions never resolve.
+
+**Fix**: Use CLOB API with direct conditionId lookup:
+
+```typescript
+// WRONG: slug-based search — unreliable, slug varies
+const response = await fetch(
+  `https://gamma-api.polymarket.com/events?slug=btc-up-or-down-15m&limit=100`
+);
+
+// CORRECT: direct conditionId lookup — guaranteed to find the market
+const response = await fetch(
+  `https://clob.polymarket.com/markets/${conditionId}`
+);
+const market = await response.json();
+if (market.closed) {
+  if (market.tokens[0]?.winner === true) return 'UP';
+  if (market.tokens[1]?.winner === true) return 'DOWN';
+}
+```
+
+**Bug B**: `loadFromFile()` dropped expired positions on restart, orphaning their trades as permanently "open". Trades were loaded with `resolved: false` but had no position for `checkAndResolveExpired` to find.
+
+**Fix**: Keep expired positions during load. Let `checkAndResolveExpired()` resolve them via the API on the next 30s cycle.
 
 ---
 
@@ -140,3 +213,5 @@ tracker.onRedemptionNeeded = (conditionId: string) => {
 | 4 | Verbose credential logging | trading-service.ts | QoL |
 | 5 | Correct FUNDER_ADDRESS (Polymarket proxy) | .env | Critical — auth fails |
 | 6 | Auto-redeem winning positions | redemption-service.ts | Feature — capital efficiency |
+| 7 | Pass actual token amounts to redeemPositions | redemption-service.ts | Critical — redemption no-op |
+| 8 | Use CLOB API for resolution + keep expired positions | paper-trading-tracker.ts | Critical — trades never resolve |
