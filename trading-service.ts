@@ -72,7 +72,10 @@ export class TradingService {
       config.funderAddress
     );
 
-    // Derive API credentials using the correct method
+    // Derive API credentials, then re-create client with creds set
+    // NOTE: ClobClient.createOrDeriveApiKey() returns creds but does NOT
+    // set this.creds internally — orders fail with "API Credentials are needed"
+    // unless we rebuild the client with the creds passed to the constructor.
     console.log(`[TradingService] Deriving API credentials...`);
     try {
       const creds = await this.client.createOrDeriveApiKey();
@@ -84,6 +87,17 @@ export class TradingService {
         console.log(`[TradingService] ⚠️ API Key is missing — orders will fail with "API Credentials are needed"`);
         console.log(`[TradingService] ⚠️ Check that FUNDER_ADDRESS is the Polymarket proxy wallet for EOA ${wallet.address}`);
       }
+
+      // Re-create client with derived creds so this.creds is set
+      this.client = new ClobClient(
+        config.clobHost,
+        config.chainId as Chain,
+        wallet,
+        creds,
+        config.signatureType,
+        config.funderAddress
+      );
+      console.log(`[TradingService] Client re-initialized with API credentials`);
     } catch (err: any) {
       console.log(`[TradingService] ❌ Credential derivation failed: ${err.message}`);
       console.log(`[TradingService] ⚠️ Verify PRIVATE_KEY and FUNDER_ADDRESS are correctly paired`);
