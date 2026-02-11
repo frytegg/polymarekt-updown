@@ -3,11 +3,12 @@
  * Clean notifications + bot commands (/live-trades, /past-trades)
  */
 
-import * as TelegramBot from 'node-telegram-bot-api';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const TelegramBot = require('node-telegram-bot-api');
 import { loadArbConfig, ArbConfig } from './config';
 import { paperTracker, PaperTrade, PaperStats, ResolutionRecord } from './paper-trading-tracker';
 
-let bot: TelegramBot | null = null;
+let bot: any = null;
 let config: ArbConfig | null = null;
 
 // =============================================================================
