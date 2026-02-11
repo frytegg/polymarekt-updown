@@ -138,8 +138,11 @@ export class TradingService {
       );
 
       // Check for error in response
-      if (response?.errorMsg) {
-        return { success: false, error: response.errorMsg };
+      // NOTE: ClobClient's http-helpers catch Axios errors and RETURN (not throw)
+      // an object like { error: "...", status: 400 }. Must check both fields.
+      const errorMsg = response?.errorMsg || response?.error;
+      if (errorMsg) {
+        return { success: false, error: typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg) };
       }
 
       return {
