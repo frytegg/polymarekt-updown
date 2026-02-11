@@ -124,13 +124,17 @@ export class TradingService {
       // Use createAndPostMarketOrder for FAK orders
       // This is the correct API for fill-and-kill behavior
       // Note: UserMarketOrder uses 'amount' not 'size'
-      // For BUY orders: amount = $$$ amount to spend
+      // For BUY orders: amount = USD to spend (NOT shares!)
       // For SELL orders: amount = shares to sell
+      // orderConfig.size is in shares, so convert to USD cost for BUY
+      const amountUsd = orderConfig.side === Side.BUY
+        ? orderConfig.size * orderConfig.price   // shares × price = USD to spend
+        : orderConfig.size;                       // SELL: amount = shares
       const response = await this.client.createAndPostMarketOrder(
         {
           tokenID: orderConfig.tokenId,
           price: orderConfig.price,
-          amount: orderConfig.size,  // 'amount' is the API field name
+          amount: amountUsd,
           side: orderConfig.side,
         },
         undefined,  // options
