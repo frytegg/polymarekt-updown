@@ -226,6 +226,52 @@ ARB_STARTUP_COOLDOWN_SEC=120   # 2 minutes (default)
 
 ---
 
+## 10. Redemption Revert Detection (Already Redeemed via UI)
+
+**Symptom**: `Redemption failed` Telegram alert with `-32000` / `transaction gas` error on bot restart, even though the position was already cashed out manually on the Polymarket UI.
+
+**Root cause**: Bot restarts, loads unresolved position from `paper-trades-*.json`, `checkAndResolveExpired()` fires, and triggers `onRedemptionNeeded`. The on-chain token balances may be non-zero (losing ERC-1155 tokens still exist), so `redeemPositions` is called — but the contract reverts because the positions were already redeemed through the UI. The bot retried 3 times (all failing) before alerting.
+
+**Fix**: Detect contract reverts and gas estimation failures (`-32000`, `CALL_EXCEPTION`, `UNPREDICTABLE_GAS_LIMIT`, `execution reverted`) and return immediately instead of retrying. These errors indicate the tx will never succeed.
+
+```typescript
+// In catch block of redeemPositions retry loop:
+if (this.isContractRevert(err)) {
+  console.log(`[Redemption] Contract revert — likely already redeemed manually. Skipping.`);
+  return;
+}
+```
+
+---
+
+## 11. Clear Paper Trading State on Startup
+
+**Symptom**: Stale positions from previous sessions trigger phantom redemption attempts and skew stats.
+
+**Root cause**: `paper-trading-tracker.ts` persists trades/positions to `data/paper-trades/*.json` and reloads on construction. After a restart, expired positions from the previous session are still in memory.
+
+**Fix**: Call `paperTracker.reset()` at the top of `start()` in `index.ts`. Clears all trades, positions, resolutions, and ID counters.
+
+---
+
+## 12. Block Trading Until Divergence EMA Is Reliable
+
+**Symptom**: False signals and losing trades in the first ~30 minutes after startup, especially during volatile markets.
+
+**Root cause**: The static fallback `oracleAdjustment` (e.g., -$104) can be $50+ off from the actual Binance-Chainlink divergence. On a 15-min binary where strike is $10-$20 from spot, a $50 error manufactures phantom 20%+ edges. The previous fix (#9) used a fixed timer, but the real gate should be EMA data readiness.
+
+**Fix**: In `checkAndTrade()`, block trading entirely until `divergenceTracker.hasReliableData()` returns true (30+ live points, or persisted EMA restored from disk within 2h). No static fallback path exists anymore — every trade uses live EMA.
+
+```typescript
+if (!divergenceTracker.hasReliableData()) {
+  console.log(`[Warmup] Divergence EMA not ready — skipping trade`);
+  return;
+}
+const adjustment = divergenceTracker.getEmaAdjustment();
+```
+
+---
+
 ## Summary Table
 
 | # | Fix | File(s) | Severity |
@@ -239,3 +285,6 @@ ARB_STARTUP_COOLDOWN_SEC=120   # 2 minutes (default)
 | 7 | Pass actual token amounts to redeemPositions | redemption-service.ts | Critical — redemption no-op |
 | 8 | Use CLOB API for resolution + keep expired positions | paper-trading-tracker.ts | Critical — trades never resolve |
 | 9 | Startup cooldown (stale oracle adjustment) | arb-trader.ts, config.ts | Critical — false signals at boot |
+| 10 | Detect contract revert on already-redeemed positions | redemption-service.ts | QoL — noisy alerts |
+| 11 | Clear paper trading state on startup | index.ts | Safety — phantom redemptions |
+| 12 | Block trading until divergence EMA ready | arb-trader.ts | Critical — false signals at boot |

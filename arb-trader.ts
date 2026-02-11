@@ -195,10 +195,16 @@ export class ArbTrader {
 
     // Apply Binance→Chainlink oracle adjustment using adaptive EMA
     // EMA adjustment tracks real-time divergence (backtest shows 64% better P&L vs static)
-    // Falls back to static config.oracleAdjustment during warm-up period
-    const adjustment = divergenceTracker.hasReliableData()
-      ? divergenceTracker.getEmaAdjustment()
-      : this.config.oracleAdjustment;
+    // Do NOT trade with static fallback — it creates false signals
+    if (!divergenceTracker.hasReliableData()) {
+      const stats = divergenceTracker.getStats();
+      if (now - this.lastLogTime >= 10_000) {
+        this.lastLogTime = now;
+        console.log(`[Warmup] Divergence EMA not ready (${stats.count}/30 points) — skipping trade`);
+      }
+      return;
+    }
+    const adjustment = divergenceTracker.getEmaAdjustment();
     const adjustedBtcPrice = this.lastBtcPrice + adjustment;
 
     // Calculate fair value with adjusted price
@@ -313,9 +319,7 @@ export class ArbTrader {
     // Paper results are intentionally optimistic for signal validation.
     if (this.config.paperTrading) {
       const fee = calculatePolymarketFee(signal.size, priceWithSlippage);
-      const adjustment = divergenceTracker.hasReliableData()
-        ? divergenceTracker.getEmaAdjustment()
-        : this.config.oracleAdjustment;
+      const adjustment = divergenceTracker.getEmaAdjustment();
 
       // Get time remaining for this market
       const timeRemainingMs = this.market.endDate.getTime() - signalTime;
@@ -331,7 +335,7 @@ export class ArbTrader {
         edge: signal.edge,
         fee,
         adjustment,
-        adjustmentMethod: divergenceTracker.hasReliableData() ? 'ema' : 'static',
+        adjustmentMethod: 'ema',
         btcPrice: btcPriceAtSignal,
         strike: this.strikeService.getStrike() || this.market.strikePrice,
         timeRemainingMs,
@@ -457,7 +461,7 @@ export class ArbTrader {
           edge: signal.edge,
           fee,
           adjustment,
-          adjustmentMethod: divergenceTracker.hasReliableData() ? 'ema' : 'static',
+          adjustmentMethod: 'ema',
           btcPrice: btcPriceAtFill,
           strike: this.strikeService.getStrike() || this.market!.strikePrice,
           timeRemainingMs,

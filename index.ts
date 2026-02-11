@@ -66,6 +66,11 @@ class CryptoPricerArb {
     // Track start time for runtime calculation
     this.startTime = Date.now();
 
+    // Clear stale paper trades, positions, and resolutions from previous session
+    // Prevents phantom redemption attempts for already-redeemed markets
+    paperTracker.reset();
+    console.log('[System] Paper trading state cleared for fresh session');
+
     // Initialize Telegram notifications
     initTelegram();
     if (isTelegramEnabled()) {

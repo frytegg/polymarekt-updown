@@ -132,6 +132,13 @@ export class RedemptionService {
         const msg = err.message?.slice(0, 120) || 'Unknown error';
         console.log(`[Redemption] Attempt ${attempt} failed: ${msg}`);
 
+        // Contract revert / gas estimation failure → tx will never succeed, skip retries
+        // Common when positions were already redeemed manually via Polymarket UI
+        if (this.isContractRevert(err)) {
+          console.log(`[Redemption] Contract revert detected — likely already redeemed manually. Skipping.`);
+          return;
+        }
+
         if (attempt < MAX_RETRIES) {
           console.log(`[Redemption] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
           await this.sleep(RETRY_DELAY_MS);
@@ -223,6 +230,27 @@ export class RedemptionService {
     );
 
     return tx;
+  }
+
+  /**
+   * Detect contract reverts / gas estimation failures that will never succeed on retry.
+   * RPC error -32000 = gas estimation failed (inner call reverts).
+   * "execution reverted" / "CALL_EXCEPTION" = contract rejected the call.
+   */
+  private isContractRevert(err: any): boolean {
+    const msg = (err.message || '').toLowerCase();
+    const code = err.code;
+
+    if (code === 'CALL_EXCEPTION' || code === 'UNPREDICTABLE_GAS_LIMIT') return true;
+    if (msg.includes('execution reverted')) return true;
+    if (msg.includes('transaction gas')) return true;
+    if (msg.includes('-32000')) return true;
+
+    // Check nested error (ethers wraps RPC errors)
+    const innerCode = err.error?.code;
+    if (innerCode === -32000 || innerCode === -32603) return true;
+
+    return false;
   }
 
   private sleep(ms: number): Promise<void> {
