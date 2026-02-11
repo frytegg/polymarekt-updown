@@ -21,6 +21,7 @@ import { TradingService } from './trading-service';
 import { divergenceTracker } from './divergence-tracker';
 import { paperTracker } from './paper-trading-tracker';
 import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './telegram';
+import { RedemptionService } from './redemption-service';
 
 dotenv.config();
 
@@ -73,6 +74,21 @@ class CryptoPricerArb {
 
     // Initialize trading service
     await this.tradingService.initialize();
+
+    // Initialize auto-redemption (live mode only)
+    if (!this.config.paperTrading && this.config.privateKey && this.config.funderAddress) {
+      const rpcUrl = process.env.RPC_URL || 'https://polygon.drpc.org';
+      const redemptionService = new RedemptionService(
+        this.config.privateKey,
+        this.config.funderAddress,
+        rpcUrl
+      );
+      paperTracker.onRedemptionNeeded = (conditionId: string) => {
+        redemptionService.redeemPositions(conditionId).catch((err: any) => {
+          console.log(`[Redemption] Async error: ${err.message?.slice(0, 80)}`);
+        });
+      };
+    }
 
     // Initialize volatility service (fetches Binance klines + Deribit data, starts refresh loop)
     await this.trader.initVol();

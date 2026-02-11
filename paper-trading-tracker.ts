@@ -131,6 +131,9 @@ class PaperTradingTracker {
   public onTradeResolved?: (trade: PaperTrade, resolution: ResolutionRecord) => void;
   public onSummaryRequested?: (stats: PaperStats) => void;
 
+  // Callback for on-chain redemption (set by index.ts in live mode)
+  public onRedemptionNeeded?: (conditionId: string) => void;
+
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data', 'paper-trades');
     if (!fs.existsSync(this.dataDir)) {
@@ -236,6 +239,11 @@ class PaperTradingTracker {
     }
 
     this.saveToFile();
+
+    // Trigger on-chain redemption (live mode)
+    if (this.onRedemptionNeeded) {
+      this.onRedemptionNeeded(marketId);
+    }
   }
 
   /**
@@ -588,6 +596,11 @@ class PaperTradingTracker {
             this.resolvePosition(noPos, outcome, outcome === 'DOWN');
           }
           this.saveToFile();
+
+          // Trigger on-chain redemption (live mode)
+          if (this.onRedemptionNeeded) {
+            this.onRedemptionNeeded(pos.marketId);
+          }
         }
       } catch (err: any) {
         // Silently retry next cycle
