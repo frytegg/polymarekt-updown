@@ -42,6 +42,9 @@ export interface ArbConfig {
   funderAddress: string;
   signatureType: number;
 
+  // Startup
+  startupCooldownSec: number;   // Seconds to wait before first trade (oracle warmup)
+
   // Telegram notifications
   telegramBotToken: string;
   telegramChatId: string;
@@ -84,6 +87,9 @@ export function loadArbConfig(): ArbConfig {
     funderAddress: process.env.FUNDER_ADDRESS || "",
     signatureType: parseInt(process.env.SIGNATURE_TYPE || "2"),
 
+    // Startup cooldown: wait for oracle/orderbook data before trading
+    startupCooldownSec: parseInt(process.env.ARB_STARTUP_COOLDOWN_SEC || "120"),
+
     // Telegram notifications
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
     telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
@@ -116,6 +122,7 @@ export function logArbConfig(config: ArbConfig): void {
   console.log(`   Max buy price: ${(config.maxBuyPrice * 100).toFixed(0)}¢`);
   console.log(`   Slippage: ${(config.slippageBps / 100).toFixed(1)}%`);
   console.log(`   Oracle adjustment: $${config.oracleAdjustment} (Binance→Chainlink)`);
+  console.log(`   Startup cooldown: ${config.startupCooldownSec}s`);
   console.log();
 }
 

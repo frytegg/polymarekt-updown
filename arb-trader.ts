@@ -29,6 +29,8 @@ export class ArbTrader {
   private lastTradeTime: number = 0; // Cooldown between trades
   private tradeCooldownMs: number = 5000; // 5 seconds between trades
   private isTrading: boolean = false; // Lock to prevent concurrent trades
+  private startupTime: number = Date.now(); // Startup cooldown anchor
+  private startupCooldownLogged: boolean = false; // Avoid log spam
   
   // Order tracking stats
   private orderStats = {
@@ -129,8 +131,20 @@ export class ArbTrader {
       return; // Not ready
     }
 
-    // Check time remaining
+    // Startup cooldown: don't trade until oracle/orderbook data stabilizes
+    // The static oracleAdjustment can be $50+ off from reality, creating phantom edges
     const now = Date.now();
+    const startupElapsedSec = (now - this.startupTime) / 1000;
+    if (startupElapsedSec < this.config.startupCooldownSec) {
+      if (!this.startupCooldownLogged || Math.floor(startupElapsedSec) % 30 === 0) {
+        const remaining = Math.ceil(this.config.startupCooldownSec - startupElapsedSec);
+        console.log(`[Warmup] Trading disabled for ${remaining}s (oracle/orderbook stabilizing)`);
+        this.startupCooldownLogged = true;
+      }
+      return;
+    }
+
+    // Check time remaining
     const secondsRemaining = (this.market.endDate.getTime() - now) / 1000;
 
     if (secondsRemaining <= this.config.stopBeforeEndSec) {

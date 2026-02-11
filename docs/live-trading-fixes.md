@@ -203,6 +203,29 @@ if (market.closed) {
 
 ---
 
+## 9. Startup Cooldown (False Signals from Stale Oracle Adjustment)
+
+**Symptom**: Immediate edge detection and fills within seconds of bot startup. These trades frequently lose.
+
+**Root cause**: At startup the divergence EMA tracker has zero data points, so the bot falls back to the static `ARB_ORACLE_ADJUSTMENT` (e.g., -$104). If the actual Binance-Chainlink divergence at that moment is -$40, the bot shifts BTC price down by an extra $64 — enough to manufacture a phantom 20%+ edge on a 15-min binary where strike is only $10-$20 from spot.
+
+**Fix**: `ARB_STARTUP_COOLDOWN_SEC` env var (default: 120s). Trading is blocked for this period after startup while the bot streams prices, refreshes orderbooks, and collects initial divergence data. Logging and state display continue normally during warmup.
+
+```typescript
+// In checkAndTrade(), top guard:
+const startupElapsedSec = (now - this.startupTime) / 1000;
+if (startupElapsedSec < this.config.startupCooldownSec) {
+  return; // Oracle/orderbook not yet stable
+}
+```
+
+```bash
+# .env
+ARB_STARTUP_COOLDOWN_SEC=120   # 2 minutes (default)
+```
+
+---
+
 ## Summary Table
 
 | # | Fix | File(s) | Severity |
@@ -215,3 +238,4 @@ if (market.closed) {
 | 6 | Auto-redeem winning positions | redemption-service.ts | Feature — capital efficiency |
 | 7 | Pass actual token amounts to redeemPositions | redemption-service.ts | Critical — redemption no-op |
 | 8 | Use CLOB API for resolution + keep expired positions | paper-trading-tracker.ts | Critical — trades never resolve |
+| 9 | Startup cooldown (stale oracle adjustment) | arb-trader.ts, config.ts | Critical — false signals at boot |
