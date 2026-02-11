@@ -58,6 +58,11 @@ export class TradingService {
 
     const wallet = new Wallet(config.privateKey);
 
+    console.log(`[TradingService] EOA (signer):     ${wallet.address}`);
+    console.log(`[TradingService] Funder (proxy):    ${config.funderAddress}`);
+    console.log(`[TradingService] Signature type:    ${config.signatureType}`);
+    console.log(`[TradingService] CLOB host:         ${config.clobHost}`);
+
     this.client = new ClobClient(
       config.clobHost,
       config.chainId as Chain,
@@ -68,7 +73,22 @@ export class TradingService {
     );
 
     // Derive API credentials using the correct method
-    await this.client.createOrDeriveApiKey();
+    console.log(`[TradingService] Deriving API credentials...`);
+    try {
+      const creds = await this.client.createOrDeriveApiKey();
+      const hasApiKey = !!creds?.key;
+      const hasSecret = !!creds?.secret;
+      const hasPassphrase = !!creds?.passphrase;
+      console.log(`[TradingService] API Key: ${hasApiKey ? '✅' : '❌ MISSING'} | Secret: ${hasSecret ? '✅' : '❌ MISSING'} | Passphrase: ${hasPassphrase ? '✅' : '❌ MISSING'}`);
+      if (!hasApiKey) {
+        console.log(`[TradingService] ⚠️ API Key is missing — orders will fail with "API Credentials are needed"`);
+        console.log(`[TradingService] ⚠️ Check that FUNDER_ADDRESS is the Polymarket proxy wallet for EOA ${wallet.address}`);
+      }
+    } catch (err: any) {
+      console.log(`[TradingService] ❌ Credential derivation failed: ${err.message}`);
+      console.log(`[TradingService] ⚠️ Verify PRIVATE_KEY and FUNDER_ADDRESS are correctly paired`);
+      throw err;
+    }
 
     this.initialized = true;
     console.log(`[TradingService] Initialized with CLOB: ${config.clobHost}`);
