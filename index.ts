@@ -92,13 +92,13 @@ class CryptoPricerArb {
       }
     }, 5 * 60 * 1000);
 
-    // Paper trading: print summary every 15 minutes
+    // Print summary every 15 minutes
     if (this.config.paperTrading) {
       console.log('[System] Paper trading mode enabled - trades will be simulated');
-      this.paperTradingSummaryInterval = setInterval(() => {
-        paperTracker.printSummary();
-      }, 15 * 60 * 1000);
     }
+    this.paperTradingSummaryInterval = setInterval(() => {
+      paperTracker.printSummary();
+    }, 15 * 60 * 1000);
 
     // Find initial markets
     const markets = await findCryptoMarkets();
@@ -369,10 +369,8 @@ class CryptoPricerArb {
     // Check for resolutions every 30 seconds
     setInterval(() => this.resolutionTracker.checkResolutions(), 30000);
 
-    // Paper trading: check and resolve expired positions every 30 seconds
-    if (this.config.paperTrading) {
-      setInterval(() => paperTracker.checkAndResolveExpired(), 30000);
-    }
+    // Check and resolve expired positions every 30 seconds
+    setInterval(() => paperTracker.checkAndResolveExpired(), 30000);
   }
 
   /**
@@ -435,20 +433,18 @@ class CryptoPricerArb {
       this.resolutionTracker.logStats();
     }
 
-    // Paper trading: print final summary and send shutdown notification
-    if (this.config.paperTrading) {
-      const paperStats = paperTracker.getStats();
-      const runTimeMinutes = Math.round((Date.now() - this.startTime) / 60000);
+    // Print final summary and send shutdown notification
+    const paperStats = paperTracker.getStats();
+    const runTimeMinutes = Math.round((Date.now() - this.startTime) / 60000);
 
-      // Send Telegram shutdown notification (fire and forget)
-      notifyShutdown({
-        totalTrades: paperStats.totalTrades,
-        realizedPnL: paperStats.realizedPnL,
-        runTimeMinutes,
-      }).catch(() => {});
+    // Send Telegram shutdown notification (fire and forget)
+    notifyShutdown({
+      totalTrades: paperStats.totalTrades,
+      realizedPnL: paperStats.realizedPnL,
+      runTimeMinutes,
+    }).catch(() => {});
 
-      paperTracker.printSummary();
-    }
+    paperTracker.printSummary();
 
     // Stop Telegram bot polling
     stopTelegram();

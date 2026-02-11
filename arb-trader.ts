@@ -425,9 +425,34 @@ export class ArbTrader {
           timestamp: fillTime,
         });
         
+        // Record fill in tracker (Telegram notifications + JSON persistence)
+        const fee = calculatePolymarketFee(signal.size, priceWithSlippage);
+        const adjustment = divergenceTracker.hasReliableData()
+          ? divergenceTracker.getEmaAdjustment()
+          : this.config.oracleAdjustment;
+        const timeRemainingMs = this.market!.endDate.getTime() - fillTime;
+
+        paperTracker.recordTrade({
+          timestamp: new Date(fillTime),
+          marketId: this.market!.conditionId,
+          tokenId,
+          side: signal.side,
+          price: priceWithSlippage,
+          size: signal.size,
+          fairValue: signal.fairValue,
+          edge: signal.edge,
+          fee,
+          adjustment,
+          adjustmentMethod: divergenceTracker.hasReliableData() ? 'ema' : 'static',
+          btcPrice: btcPriceAtFill,
+          strike: this.strikeService.getStrike() || this.market!.strikePrice,
+          timeRemainingMs,
+          marketEndTime: this.market!.endDate.getTime(),
+        });
+
         // Update position via PositionManager
         this.positionManager.updatePosition(signal.side, signal.size, priceWithSlippage);
-        
+
         this.positionManager.logTotalSpent();
         this.positionManager.logPosition();
       }

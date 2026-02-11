@@ -133,7 +133,7 @@ function registerCommands(): void {
     if (msg.chat.id.toString() !== config!.telegramChatId) return;
 
     const message = `
-🤖 <b>Paper Trading Bot Commands</b>
+🤖 <b>Bot Commands</b>
 
 /live - Show active positions
 /past - Show resolved trades

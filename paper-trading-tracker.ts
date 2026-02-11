@@ -281,7 +281,7 @@ class PaperTradingTracker {
     // Console log
     const emoji = isWin ? '🟢' : '🔴';
     console.log(
-      `[PAPER] Resolution #${resolution.id}: ${position.side} ${isWin ? 'WON' : 'LOST'} | ` +
+      `[TRACKER] Resolution #${resolution.id}: ${position.side} ${isWin ? 'WON' : 'LOST'} | ` +
       `${position.shares} shares @ ${(position.avgPrice * 100).toFixed(1)}¢ | ` +
       `${emoji} P&L: $${pnl.toFixed(2)}`
     );
@@ -366,7 +366,7 @@ class PaperTradingTracker {
   private logTrade(trade: PaperTrade): void {
     const adjMethod = trade.adjustmentMethod === 'ema' ? 'EMA' : 'STATIC';
     console.log(
-      `\n[PAPER TRADE #${trade.id}] BUY ${trade.size} ${trade.side} @ ${(trade.price * 100).toFixed(1)}¢ | ` +
+      `\n[TRADE #${trade.id}] BUY ${trade.size} ${trade.side} @ ${(trade.price * 100).toFixed(1)}¢ | ` +
       `Edge: +${(trade.edge * 100).toFixed(1)}% | ` +
       `Cost: $${trade.cost.toFixed(2)} | ` +
       `Max Profit: $${trade.maxProfit.toFixed(2)} | ` +
@@ -380,7 +380,7 @@ class PaperTradingTracker {
   printSummary(): void {
     const stats = this.getStats();
 
-    console.log('\n============ PAPER TRADING SUMMARY ============');
+    console.log('\n============ TRADING SUMMARY ============');
     console.log(`Total Trades:     ${stats.totalTrades} (${stats.openTrades} open, ${stats.resolvedTrades} resolved)`);
     console.log(`Realized P&L:     $${stats.realizedPnL.toFixed(2)}`);
     console.log(`Total Fees:       $${stats.totalFeesPaid.toFixed(2)}`);
@@ -398,7 +398,7 @@ class PaperTradingTracker {
         console.log(`  ${pos.side}: ${pos.shares} @ ${(pos.avgPrice * 100).toFixed(1)}¢ | Cost: $${pos.totalCost.toFixed(2)} | Trades: ${tradeIdsStr}`);
       }
     }
-    console.log('===============================================\n');
+    console.log('=========================================\n');
 
     // Notify via callback
     if (this.onSummaryRequested) {
@@ -431,7 +431,7 @@ class PaperTradingTracker {
 
       fs.writeFileSync(this.logFile, JSON.stringify(data, null, 2));
     } catch (err: any) {
-      console.error(`[PAPER] Save failed: ${err.message}`);
+      console.error(`[TRACKER] Save failed: ${err.message}`);
     }
   }
 
@@ -512,7 +512,7 @@ class PaperTradingTracker {
 
           // Skip positions for markets that have already expired
           if (marketEndTime > 0 && marketEndTime < now) {
-            console.log(`[PAPER] Skipping expired position for market ending at ${new Date(marketEndTime).toISOString()}`);
+            console.log(`[TRACKER] Skipping expired position for market ending at ${new Date(marketEndTime).toISOString()}`);
             skippedPositions++;
             continue;
           }
@@ -543,7 +543,7 @@ class PaperTradingTracker {
         this.nextTradeId = data.meta?.nextTradeId || this.trades.length + 1;
         this.nextResolutionId = data.meta?.nextResolutionId || this.resolutions.length + 1;
 
-        const loadMsg = `[PAPER] Loaded ${this.trades.length} trades, ${this.positions.size} positions`;
+        const loadMsg = `[TRACKER] Loaded ${this.trades.length} trades, ${this.positions.size} positions`;
         const skipMsg = skippedTrades > 0 || skippedPositions > 0
           ? ` (skipped ${skippedTrades} invalid trades, ${skippedPositions} stale/invalid positions)`
           : '';
@@ -555,7 +555,7 @@ class PaperTradingTracker {
         }
       }
     } catch (err: any) {
-      console.error(`[PAPER] Load failed: ${err.message}`);
+      console.error(`[TRACKER] Load failed: ${err.message}`);
     }
   }
 
