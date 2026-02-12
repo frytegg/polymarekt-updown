@@ -57,7 +57,10 @@
       "WebFetch(domain:quantjourney.substack.com)",
       "WebFetch(domain:www.financemagnates.com)",
       "Bash(git mv:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(for file in arb-trader.ts binance-ws.ts divergence-tracker.ts execution-metrics.ts market-finder.ts orderbook-service.ts position-manager.ts redemption-service.ts resolution-tracker.ts strike-service.ts telegram.ts trade-persistence.ts trading-service.ts volatility-service.ts)",
+      "Bash(do git mv \"$file\" \"live/$file\")",
+      "Bash(done)"
     ]
   }
 }

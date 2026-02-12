@@ -8,8 +8,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { createLogger, Logger, safeErrorData } from './core/logger';
-import { calculatePolymarketFee } from './core/fees';
+import { createLogger, Logger, safeErrorData } from '../core/logger';
+import { calculatePolymarketFee } from '../core/fees';
 
 // =============================================================================
 // TYPES
@@ -110,7 +110,7 @@ export interface PaperStats {
 // =============================================================================
 
 // Re-export fee calculator from core
-export { calculatePolymarketFee } from './core/fees';
+export { calculatePolymarketFee } from '../core/fees';
 
 // =============================================================================
 // TRADE PERSISTENCE SERVICE

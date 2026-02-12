@@ -13,7 +13,7 @@
  */
 
 const axios = require('axios');
-import { calculateRealizedVol as coreCalculateRealizedVol } from './core/vol-calculator';
+import { calculateRealizedVol as coreCalculateRealizedVol } from '../core/vol-calculator';
 
 // =============================================================================
 // TYPES

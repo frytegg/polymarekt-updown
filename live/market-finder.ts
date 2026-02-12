@@ -9,8 +9,8 @@
  */
 
 const axios = require('axios');
-import { CryptoMarket } from './core/types';
-import { createLogger, rateLimitedLog } from './core/logger';
+import { CryptoMarket } from '../core/types';
+import { createLogger, rateLimitedLog } from '../core/logger';
 
 const log = createLogger('MarketFinder', { mode: 'live' });
 const GAMMA_API_URL = 'https://gamma-api.polymarket.com';

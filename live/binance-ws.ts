@@ -7,8 +7,8 @@
 
 const WebSocket = require('ws');
 const axios = require('axios');
-import { BinancePrice, PriceCallback } from './core/types';
-import { createLogger, rateLimitedLog, safeErrorData, Logger } from './core/logger';
+import { BinancePrice, PriceCallback } from '../core/types';
+import { createLogger, rateLimitedLog, safeErrorData, Logger } from '../core/logger';
 
 // Try multiple endpoints in order of preference
 const BINANCE_WS_URLS = [

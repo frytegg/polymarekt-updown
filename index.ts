@@ -11,17 +11,17 @@ import * as dotenv from 'dotenv';
 import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 
 import { loadArbConfig, validateArbConfig, logArbConfig, ArbConfig } from './core/config';
-import { BinanceWebSocket } from './binance-ws';
-import { findCryptoMarkets, findNextMarket, logMarket } from './market-finder';
-import { ArbTrader } from './arb-trader';
+import { BinanceWebSocket } from './live/binance-ws';
+import { findCryptoMarkets, findNextMarket, logMarket } from './live/market-finder';
+import { ArbTrader } from './live/arb-trader';
 import { CryptoMarket, OrderBookState } from './core/types';
-import { OrderbookService, getDefaultOrderBookState } from './orderbook-service';
-import { ResolutionTracker } from './resolution-tracker';
-import { TradingService } from './trading-service';
-import { divergenceTracker } from './divergence-tracker';
-import { paperTracker } from './trade-persistence';
-import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './telegram';
-import { RedemptionService } from './redemption-service';
+import { OrderbookService, getDefaultOrderBookState } from './live/orderbook-service';
+import { ResolutionTracker } from './live/resolution-tracker';
+import { TradingService } from './live/trading-service';
+import { divergenceTracker } from './live/divergence-tracker';
+import { paperTracker } from './live/trade-persistence';
+import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './live/telegram';
+import { RedemptionService } from './live/redemption-service';
 
 dotenv.config();
 

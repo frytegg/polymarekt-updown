@@ -5,16 +5,16 @@
 
 import { Side } from '@polymarket/clob-client';
 import { TradingService, OrderConfig } from './trading-service';
-import { ArbConfig } from './core/config';
-import { CryptoMarket, OrderBookState, Position, TradeSignal, BinancePrice, FairValue } from './core/types';
-import { calculateFairValue, calculateEdge, formatFairValue } from './core/fair-value';
+import { ArbConfig } from '../core/config';
+import { CryptoMarket, OrderBookState, Position, TradeSignal, BinancePrice, FairValue } from '../core/types';
+import { calculateFairValue, calculateEdge, formatFairValue } from '../core/fair-value';
 import { volatilityService } from './volatility-service';
 import { ExecutionMetricsTracker, ExecutionStats, TradeMetric } from './execution-metrics';
 import { PositionManager } from './position-manager';
 import { StrikePriceService } from './strike-service';
 import { divergenceTracker } from './divergence-tracker';
 import { paperTracker, calculatePolymarketFee } from './trade-persistence';
-import { createLogger, rateLimitedLog, Logger } from './core/logger';
+import { createLogger, rateLimitedLog, Logger } from '../core/logger';
 
 export class ArbTrader {
   // Position management (delegated)

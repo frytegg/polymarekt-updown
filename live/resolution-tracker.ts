@@ -6,7 +6,7 @@
  * Telegram notifications are handled by trade-persistence callbacks.
  */
 
-import { createLogger, Logger } from './core/logger';
+import { createLogger, Logger } from '../core/logger';
 
 // =============================================================================
 // TYPES
