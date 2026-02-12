@@ -38,7 +38,7 @@ export class BinanceWebSocket {
   private currentWsUrlIndex = 0;
   private currentRestUrlIndex = 0;
   private wsBlocked = false;
-  private log: Logger = createLogger('BinanceWS');
+  private log: Logger = createLogger('BinanceWS', { mode: 'live' });
   private wsConnId = 0;
 
   constructor(symbol: string = 'btcusdt') {

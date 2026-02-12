@@ -292,9 +292,17 @@ function makeLogger(module: string, baseFields: LogData): Logger {
 
 /**
  * Create a child logger scoped to a module name.
+ * @param module - Module name (e.g., 'ArbTrader', 'Backtest:Simulator')
+ * @param fields - Optional fields to include in every log entry
+ * @param fields.mode - Execution mode: 'live' | 'backtest' | 'paper' (defaults to 'live')
  */
 export function createLogger(module: string, fields?: LogData): Logger {
-  return makeLogger(module, fields ?? {});
+  // Add default mode if not provided
+  const fieldsWithMode = {
+    mode: 'live',
+    ...fields,
+  };
+  return makeLogger(module, fieldsWithMode);
 }
 
 // =============================================================================

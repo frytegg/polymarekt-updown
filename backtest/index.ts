@@ -23,6 +23,9 @@ import { BacktestConfig, BacktestMode, AdjustmentMethod } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
 import { printPnLCurve, printDrawdownAnalysis, exportPnLCurveToCsv } from './output/pnl-curve';
+import { createLogger } from '../logger';
+
+const log = createLogger('Backtest:CLI', { mode: 'backtest' });
 
 // Parse command line arguments
 function parseArgs(): {

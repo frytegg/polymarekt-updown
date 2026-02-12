@@ -34,7 +34,7 @@ export interface StrikePriceResult {
 // STRIKE PRICE SERVICE CLASS
 // =============================================================================
 
-const strikeLog = createLogger('StrikeService');
+const strikeLog = createLogger('StrikeService', { mode: 'live' });
 
 export class StrikePriceService {
   private currentStrike: number = 0;

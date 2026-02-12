@@ -84,7 +84,7 @@ export class ResolutionTracker {
   private isCheckingResolutions: boolean = false;
   private lastStatsLog: number = 0;
   private statsLogInterval: number;
-  private log: Logger = createLogger('ResolutionTracker');
+  private log: Logger = createLogger('ResolutionTracker', { mode: 'live' });
 
   /**
    * @param statsLogIntervalMs - Interval between automatic stats logging (default: 10 minutes)

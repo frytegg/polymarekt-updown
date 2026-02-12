@@ -26,6 +26,7 @@ import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
 import { BlackScholesStrategy } from '../../strategies';
 import { DivergenceCalculator } from './divergence-calculator';
+import { createLogger } from '../../logger';
 
 const DEFAULT_CONFIG: BacktestConfig = {
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -87,6 +88,9 @@ export class Simulator {
     // Trade cooldown and limit tracking (per market)
     private lastTradeTimestamp: Map<string, number> = new Map(); // key: marketId:side
     private marketTradeCount: Map<string, number> = new Map();   // key: marketId
+
+    // Logging
+    private log = createLogger('Backtest:Simulator', { mode: 'backtest' });
 
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };

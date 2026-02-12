@@ -40,7 +40,7 @@ export class ArbTrader {
   };
 
   // Logging
-  private log: Logger = createLogger('ArbTrader');
+  private log: Logger = createLogger('ArbTrader', { mode: 'live' });
   private lastLogTime: number = 0;
   private statusLogIntervalMs: number = 5000; // Status line interval (DEBUG)
   

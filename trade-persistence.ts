@@ -129,7 +129,7 @@ class TradePersistence {
   private nextResolutionId: number = 1;
   private logFile: string;
   private dataDir: string;
-  private log: Logger = createLogger('PaperTracker');
+  private log: Logger = createLogger('TradePersistence', { mode: 'live' });
 
   // Callbacks for Telegram notifications (set by telegram.ts)
   public onTradeOpened?: (trade: PaperTrade) => void;
