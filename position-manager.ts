@@ -1,8 +1,12 @@
 /**
- * Position Manager
- * 
- * Manages trading positions, cost basis tracking, order sizing, and P&L calculations.
- * Handles USD-based position limits and provides position state.
+ * Position Manager (Live Trading)
+ *
+ * Manages real-time position state for a single active market.
+ * Uses USD-based position limits and incremental state mutation.
+ *
+ * NOTE: Backtest uses a separate implementation (backtest/engine/position-tracker.ts)
+ * with multi-market batch processing and share-based limits.
+ * These are intentionally separate — see ARCHITECTURE-AUDIT.md §2.1.
  */
 
 import { Position, OrderBookState } from './types';

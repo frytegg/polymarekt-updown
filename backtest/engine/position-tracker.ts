@@ -1,6 +1,12 @@
 /**
- * Position Tracker for Backtest
- * Tracks positions per market and handles resolution (settle to $1 or $0)
+ * Position Tracker (Backtest)
+ *
+ * Tracks positions across multiple markets during historical simulation.
+ * Uses share-based limits, immutable state, and batch P&L calculation.
+ *
+ * NOTE: Live trading uses a separate implementation (position-manager.ts)
+ * with USD-based limits and real-time state mutation.
+ * These are intentionally separate — see ARCHITECTURE-AUDIT.md §2.1.
  */
 
 import { Trade, MarketPosition, MarketResolution, PnLPoint } from '../types';
