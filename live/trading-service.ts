@@ -23,27 +23,14 @@ export class TradingService implements ITradingService {
 
   /**
    * Initialize the CLOB client with credentials from environment
-   * Skips initialization in paper trading mode (no credentials needed)
+   *
+   * This is the LIVE TRADING implementation.
+   * Paper trading uses MockTradingService (paper/mock-trading-service.ts).
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     const config = loadArbConfig();
-
-    /**
-     * PAPER MODE BYPASS
-     * When PAPER_TRADING=true, we skip CLOB client initialization.
-     * The arb-trader still calls methods on this service, but they
-     * return early / no-op in paper mode.
-     *
-     * Future: Replace with interface + dependency injection
-     * (see ARCHITECTURE-AUDIT.md §2.6 and Phase 4)
-     */
-    if (config.paperTrading) {
-      this.initialized = true;
-      console.log('[TradingService] Paper trading mode - CLOB client not initialized');
-      return;
-    }
 
     if (!config.privateKey || !config.funderAddress) {
       throw new Error('PRIVATE_KEY and FUNDER_ADDRESS must be set in environment');

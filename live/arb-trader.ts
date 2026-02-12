@@ -315,62 +315,6 @@ export class ArbTrader {
     // Round to tick size (0.01) and cap at 0.99
     priceWithSlippage = Math.min(0.99, Math.round(priceWithSlippage * 100) / 100);
 
-    // ==================== PAPER TRADING MODE ====================
-    // Paper trading assumes 100% fill at slippage-adjusted price.
-    // Live FAK orders may partially fill or fail entirely.
-    // Paper results are intentionally optimistic for signal validation.
-    if (this.config.paperTrading) {
-      const fee = calculatePolymarketFee(signal.size, priceWithSlippage);
-      const adjustment = divergenceTracker.getEmaAdjustment();
-
-      // Get time remaining for this market
-      const timeRemainingMs = this.market.endDate.getTime() - signalTime;
-
-      paperTracker.recordTrade({
-        timestamp: new Date(signalTime),
-        marketId: this.market.conditionId,
-        tokenId,
-        side: signal.side,
-        price: priceWithSlippage,
-        size: signal.size,
-        fairValue: signal.fairValue,
-        edge: signal.edge,
-        fee,
-        adjustment,
-        adjustmentMethod: 'ema',
-        btcPrice: btcPriceAtSignal,
-        strike: this.strikeService.getStrike() || this.market.strikePrice,
-        timeRemainingMs,
-        marketEndTime: this.market.endDate.getTime(),
-      });
-
-      // Record trade for resolution tracking (same as live)
-      this.currentMarketTrades.push({
-        side: signal.side,
-        price: priceWithSlippage,
-        size: signal.size,
-        fairValue: signal.fairValue,
-        expectedEdge: signal.fairValue - priceWithSlippage,
-        timestamp: signalTime,
-      });
-
-      // Update position via PositionManager (simulated)
-      this.positionManager.updatePosition(signal.side, signal.size, priceWithSlippage);
-
-      const posState = this.positionManager.getState();
-      this.log.info('trade.paper_filled', {
-        side: signal.side, price: priceWithSlippage, size: signal.size,
-        totalSpent: +posState.totalUsdSpent.toFixed(2),
-        yesShares: posState.position.yesShares, noShares: posState.position.noShares,
-      });
-
-      // Release lock
-      this.isTrading = false;
-      this.log.info('trade.lock_released', { side: signal.side });
-      return;
-    }
-    // ============================================================
-
     const orderConfig: OrderConfig = {
       tokenId,
       price: priceWithSlippage,
