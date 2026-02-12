@@ -4,7 +4,8 @@
  */
 
 import { Side } from '@polymarket/clob-client';
-import { TradingService, OrderConfig } from './trading-service';
+import { ITradingService } from '../core/trading-interface';
+import { OrderConfig } from './trading-service';
 import { ArbConfig } from '../core/config';
 import { CryptoMarket, OrderBookState, Position, TradeSignal, BinancePrice, FairValue } from '../core/types';
 import { calculateFairValue, calculateEdge, formatFairValue } from '../core/fair-value';
@@ -59,7 +60,7 @@ export class ArbTrader {
 
   constructor(
     private config: ArbConfig,
-    private tradingService: TradingService
+    private tradingService: ITradingService
   ) {
     // Initialize position manager with limits from config
     this.positionManager = new PositionManager({

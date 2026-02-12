@@ -11,6 +11,7 @@ import * as dotenv from 'dotenv';
 import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 
 import { loadArbConfig, validateArbConfig, logArbConfig, ArbConfig } from './core/config';
+import { ITradingService } from './core/trading-interface';
 import { BinanceWebSocket } from './live/binance-ws';
 import { findCryptoMarkets, findNextMarket, logMarket } from './live/market-finder';
 import { ArbTrader } from './live/arb-trader';
@@ -18,6 +19,7 @@ import { CryptoMarket, OrderBookState } from './core/types';
 import { OrderbookService, getDefaultOrderBookState } from './live/orderbook-service';
 import { ResolutionTracker } from './live/resolution-tracker';
 import { TradingService } from './live/trading-service';
+import { MockTradingService } from './paper/mock-trading-service';
 import { divergenceTracker } from './live/divergence-tracker';
 import { paperTracker } from './live/trade-persistence';
 import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './live/telegram';
@@ -29,7 +31,7 @@ class CryptoPricerArb {
   private config: ArbConfig;
   private binanceWs: BinanceWebSocket;
   private polymarketWs: RealTimeDataClient | null = null;
-  private tradingService: TradingService;
+  private tradingService: ITradingService;
   private orderbookService: OrderbookService;
   private resolutionTracker: ResolutionTracker;
   private trader: ArbTrader;
@@ -48,7 +50,12 @@ class CryptoPricerArb {
     validateArbConfig(this.config);
 
     // Initialize services
-    this.tradingService = new TradingService();
+    // DEPENDENCY INJECTION: Single point where paper vs live mode is decided
+    // After this, all code is mode-agnostic and works through the ITradingService interface
+    this.tradingService = this.config.paperTrading
+      ? new MockTradingService()
+      : new TradingService();
+
     this.orderbookService = new OrderbookService(this.config.clobHost);
     this.resolutionTracker = new ResolutionTracker();
 
