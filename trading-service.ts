@@ -45,7 +45,15 @@ export class TradingService {
 
     const config = loadArbConfig();
 
-    // Skip CLOB initialization in paper trading mode
+    /**
+     * PAPER MODE BYPASS
+     * When PAPER_TRADING=true, we skip CLOB client initialization.
+     * The arb-trader still calls methods on this service, but they
+     * return early / no-op in paper mode.
+     *
+     * Future: Replace with interface + dependency injection
+     * (see ARCHITECTURE-AUDIT.md §2.6 and Phase 4)
+     */
     if (config.paperTrading) {
       this.initialized = true;
       console.log('[TradingService] Paper trading mode - CLOB client not initialized');
