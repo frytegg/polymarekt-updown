@@ -14,14 +14,15 @@ import { PositionManager } from './position-manager';
 import { StrikePriceService } from './strike-service';
 import { divergenceTracker } from './divergence-tracker';
 import { paperTracker, calculatePolymarketFee } from './paper-trading-tracker';
+import { createLogger, rateLimitedLog, Logger } from './logger';
 
 export class ArbTrader {
   // Position management (delegated)
   private positionManager: PositionManager;
-  
+
   // Strike price management (delegated)
   private strikeService: StrikePriceService = new StrikePriceService();
-  
+
   private lastBtcPrice: number = 0;
   private lastOrderBook: OrderBookState | null = null;
   private lastFairValue: FairValue | null = null;
@@ -30,17 +31,18 @@ export class ArbTrader {
   private tradeCooldownMs: number = 5000; // 5 seconds between trades
   private isTrading: boolean = false; // Lock to prevent concurrent trades
   private startupTime: number = Date.now(); // Startup cooldown anchor
-  private startupCooldownLogged: boolean = false; // Avoid log spam
-  
+
   // Order tracking stats
   private orderStats = {
     success: 0,
     failed: 0,
     totalLatencyMs: 0,
   };
-  
+
   // Logging
+  private log: Logger = createLogger('ArbTrader');
   private lastLogTime: number = 0;
+  private statusLogIntervalMs: number = 5000; // Status line interval (DEBUG)
   
   // Execution metrics tracking (for backtest calibration)
   private executionMetrics: ExecutionMetricsTracker = new ExecutionMetricsTracker();
@@ -74,7 +76,8 @@ export class ArbTrader {
   setMarket(market: CryptoMarket): void {
     this.market = market;
     this.resetPosition();
-    console.log(`🎯 Trading market: ${market.question.slice(0, 50)}...`);
+    this.log = this.log.child({ marketId: market.conditionId.slice(0, 12) });
+    this.log.info('market.set', { question: market.question.slice(0, 50) });
   }
 
   /**
@@ -136,11 +139,9 @@ export class ArbTrader {
     const now = Date.now();
     const startupElapsedSec = (now - this.startupTime) / 1000;
     if (startupElapsedSec < this.config.startupCooldownSec) {
-      if (!this.startupCooldownLogged || Math.floor(startupElapsedSec) % 30 === 0) {
-        const remaining = Math.ceil(this.config.startupCooldownSec - startupElapsedSec);
-        console.log(`[Warmup] Trading disabled for ${remaining}s (oracle/orderbook stabilizing)`);
-        this.startupCooldownLogged = true;
-      }
+      const remaining = Math.ceil(this.config.startupCooldownSec - startupElapsedSec);
+      rateLimitedLog(this.log, 'info', 'warmup.cooldown', 30_000,
+        'warmup.cooldown', { remainingSec: remaining });
       return;
     }
 
@@ -164,13 +165,9 @@ export class ArbTrader {
     const marketStarted = this.market.startTime.getTime() <= now;
     
     if (!marketStarted) {
-      // Market hasn't started yet - wait for strike to be determined
       const secsToStart = Math.ceil((this.market.startTime.getTime() - now) / 1000);
-      // Log only once per second and only at certain intervals
-      if (now - this.lastLogTime >= 1000 && secsToStart % 5 === 0) {
-        this.lastLogTime = now;
-        console.log(`⏳ Waiting ${secsToStart}s for market start (strike will be captured)...`);
-      }
+      rateLimitedLog(this.log, 'debug', 'warmup.market_start', 5_000,
+        'warmup.awaiting_market_start', { secsToStart });
       return;
     }
     
@@ -198,10 +195,8 @@ export class ArbTrader {
     // Do NOT trade with static fallback — it creates false signals
     if (!divergenceTracker.hasReliableData()) {
       const stats = divergenceTracker.getStats();
-      if (now - this.lastLogTime >= 10_000) {
-        this.lastLogTime = now;
-        console.log(`[Warmup] Divergence EMA not ready (${stats.count}/30 points) — skipping trade`);
-      }
+      rateLimitedLog(this.log, 'info', 'warmup.ema', 30_000,
+        'warmup.ema_not_ready', { points: stats.count, required: 30 });
       return;
     }
     const adjustment = divergenceTracker.getEmaAdjustment();
@@ -225,8 +220,7 @@ export class ArbTrader {
 
     // Check cooldown and lock (reuse `now` from above)
     if (this.isTrading) {
-      console.log(`   ⏸️ Trade in progress, skipping...`);
-      return;
+      return; // Lock held — trade.lock_acquired already logged
     }
     if (now - this.lastTradeTime < this.tradeCooldownMs) {
       // Don't log this every tick - too spammy
@@ -237,7 +231,13 @@ export class ArbTrader {
     const signal = this.findBestSignal(fairValue, edgeYes, edgeNo);
     
     if (signal) {
-      console.log(`   ✨ SIGNAL FOUND: ${signal.side} @ ${(signal.marketPrice*100).toFixed(0)}¢ x${signal.size}`);
+      this.log.info('trade.signal', {
+        side: signal.side,
+        price: signal.marketPrice,
+        size: signal.size,
+        edge: +(signal.edge * 100).toFixed(1),
+        fairValue: +(signal.fairValue * 100).toFixed(1),
+      });
       this.executeTrade(signal);
     }
   }
@@ -298,6 +298,7 @@ export class ArbTrader {
 
     // Set lock and capture signal timing
     this.isTrading = true;
+    this.log.info('trade.lock_acquired', { side: signal.side });
     const signalTime = Date.now();
     const btcPriceAtSignal = this.lastBtcPrice;
     this.lastTradeTime = signalTime;
@@ -355,11 +356,16 @@ export class ArbTrader {
       // Update position via PositionManager (simulated)
       this.positionManager.updatePosition(signal.side, signal.size, priceWithSlippage);
 
-      this.positionManager.logTotalSpent();
-      this.positionManager.logPosition();
+      const posState = this.positionManager.getState();
+      this.log.info('trade.paper_filled', {
+        side: signal.side, price: priceWithSlippage, size: signal.size,
+        totalSpent: +posState.totalUsdSpent.toFixed(2),
+        yesShares: posState.position.yesShares, noShares: posState.position.noShares,
+      });
 
       // Release lock
       this.isTrading = false;
+      this.log.info('trade.lock_released', { side: signal.side });
       return;
     }
     // ============================================================
@@ -397,16 +403,16 @@ export class ArbTrader {
       
       const result = await Promise.race([orderPromise, timeoutPromise]);
       
-      // Log AFTER execution (non-blocking)
-      console.log(`\n🚀 TRADE: BUY ${logData.size} ${logData.side} @ $${logData.priceWithSlippage.toFixed(2)} (ask: ${logData.marketPrice.toFixed(2)}, +${logData.slippagePct}% slip)`);
-      console.log(`   📊 Edge: +${(logData.edge * 100).toFixed(1)}¢ | Fair: ${(logData.fairValue * 100).toFixed(1)}%`);
-      
       if (result?.error) {
         this.orderStats.failed++;
-        const avgLatency = this.orderStats.success > 0 
-          ? Math.round(this.orderStats.totalLatencyMs / this.orderStats.success) 
+        const avgLatency = this.orderStats.success > 0
+          ? Math.round(this.orderStats.totalLatencyMs / this.orderStats.success)
           : 0;
-        console.log(`   ❌ Order rejected: ${result.error} | Orders: ${this.orderStats.success}✅/${this.orderStats.failed}❌ | Avg: ${avgLatency}ms`);
+        this.log.warn('trade.rejected', {
+          side: logData.side, price: logData.priceWithSlippage, size: logData.size,
+          reason: result.error, successCount: this.orderStats.success,
+          failCount: this.orderStats.failed, avgLatencyMs: avgLatency,
+        });
       } else {
         // FAK order succeeded = filled what was available!
         const fillTime = Date.now();
@@ -418,7 +424,12 @@ export class ArbTrader {
         this.orderStats.totalLatencyMs += latencyMs;
         const avgLatency = Math.round(this.orderStats.totalLatencyMs / this.orderStats.success);
         
-        console.log(`   ✅ FILLED! (FAK) [${latencyMs}ms] | Orders: ${this.orderStats.success}✅/${this.orderStats.failed}❌ | Avg: ${avgLatency}ms`);
+        this.log.info('trade.filled', {
+          side: logData.side, price: logData.priceWithSlippage, size: logData.size,
+          edge: +(logData.edge * 100).toFixed(1), fairValue: +(logData.fairValue * 100).toFixed(1),
+          latencyMs, successCount: this.orderStats.success,
+          failCount: this.orderStats.failed, avgLatencyMs: avgLatency,
+        });
         
         // Record execution metrics for backtest calibration
         this.executionMetrics.record(
@@ -470,41 +481,38 @@ export class ArbTrader {
 
         // Update position via PositionManager
         this.positionManager.updatePosition(signal.side, signal.size, priceWithSlippage);
-
-        this.positionManager.logTotalSpent();
-        this.positionManager.logPosition();
       }
     } catch (error: any) {
       // Order placement failed - track it
       this.orderStats.failed++;
-      const avgLatency = this.orderStats.success > 0 
-        ? Math.round(this.orderStats.totalLatencyMs / this.orderStats.success) 
+      const avgLatency = this.orderStats.success > 0
+        ? Math.round(this.orderStats.totalLatencyMs / this.orderStats.success)
         : 0;
-      const statsStr = `| Orders: ${this.orderStats.success}✅/${this.orderStats.failed}❌ | Avg: ${avgLatency}ms`;
-      
+
       const msg = error.message || '';
       const status = error.response?.status;
-      
-      if (status === 403) {
-        console.log(`   🚫 Cloudflare blocked (403) - wait or change IP ${statsStr}`);
-      } else if (status === 429) {
-        console.log(`   ⏳ Rate limited (429) - slowing down ${statsStr}`);
-      } else if (msg.includes('timeout')) {
-        console.log(`   ⏱️ ${msg} ${statsStr}`);
-      } else if (msg.includes('not enough') || msg.includes('insufficient')) {
-        console.log(`   💰 Insufficient balance ${statsStr}`);
-      } else {
-        console.log(`   ❌ Trade error: ${msg.slice(0, 50)} ${statsStr}`);
-      }
+      let category = 'unknown';
+      if (status === 403) category = 'cloudflare_blocked';
+      else if (status === 429) category = 'rate_limited';
+      else if (msg.includes('timeout')) category = 'timeout';
+      else if (msg.includes('not enough') || msg.includes('insufficient')) category = 'insufficient_balance';
+
+      this.log.error('trade.error', {
+        category, side: signal.side, httpStatus: status,
+        error: msg.slice(0, 120),
+        successCount: this.orderStats.success,
+        failCount: this.orderStats.failed, avgLatencyMs: avgLatency,
+      });
     } finally {
       // Release lock
       this.isTrading = false;
+      this.log.info('trade.lock_released', { side: signal.side });
     }
   }
 
   
   /**
-   * Log current state in real-time (throttled to once per second)
+   * Log current state (DEBUG level, throttled to statusLogIntervalMs)
    */
   private logState(
     fairValue: FairValue,
@@ -514,47 +522,31 @@ export class ArbTrader {
     currentVol: number
   ): void {
     if (!this.lastOrderBook || !this.market) return;
-    
-    // Throttle logging to once per second
+    if (!this.log.isEnabled('debug')) return;
+
     const now = Date.now();
-    if (now - this.lastLogTime < 1000) return;
+    if (now - this.lastLogTime < this.statusLogIntervalMs) return;
     this.lastLogTime = now;
-    
-    const timeStr = `${Math.floor(secondsRemaining / 60)}:${String(Math.floor(secondsRemaining % 60)).padStart(2, '0')}`;
-    
-    // Calculate P&L via PositionManager
+
     const pnl = this.positionManager.calculatePnL(this.lastOrderBook);
-    const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
-    const pnlColor = pnl >= 0 ? '🟢' : '🔴';
-    
-    // Strike vs current
     const strike = this.strikeService.getStrike() || this.market.strikePrice;
-    const pctFromStrike = ((this.lastBtcPrice - strike) / strike * 100);
-    const direction = pctFromStrike >= 0 ? '📈' : '📉';
-    
-    // Edge indicators
-    const edgeYesStr = edgeYes > 0 ? `+${(edgeYes * 100).toFixed(1)}` : `${(edgeYes * 100).toFixed(1)}`;
-    const edgeNoStr = edgeNo > 0 ? `+${(edgeNo * 100).toFixed(1)}` : `${(edgeNo * 100).toFixed(1)}`;
-    const yesSignal = edgeYes >= this.config.edgeMinimum ? '🎯' : '  ';
-    const noSignal = edgeNo >= this.config.edgeMinimum ? '🎯' : '  ';
-    
-    // Volatility display (annualized %)
-    const volStr = `σ${(currentVol * 100).toFixed(0)}%`;
-    
-    // Get position for display
     const pos = this.positionManager.getPosition();
-    
-    // Clear line and print status
-    console.log(
-      `\r[${timeStr}] ` +
-      `BTC: $${this.lastBtcPrice.toFixed(0)} ${direction}${pctFromStrike >= 0 ? '+' : ''}${pctFromStrike.toFixed(2)}% | ` +
-      `${volStr} | ` +
-      `Fair: ${(fairValue.pUp * 100).toFixed(0)}%UP/${(fairValue.pDown * 100).toFixed(0)}%DOWN | ` +
-      `Book: ${(this.lastOrderBook.yesBid * 100).toFixed(0)}/${(this.lastOrderBook.yesAsk * 100).toFixed(0)}¢ | ` +
-      `Edge: UP${edgeYesStr}¢${yesSignal} DOWN${edgeNoStr}¢${noSignal} | ` +
-      `Pos: ${pos.yesShares}Y/${pos.noShares}N | ` +
-      `${pnlColor} P&L: ${pnlStr}`
-    );
+
+    this.log.debug('status.tick', {
+      timeLeft: `${Math.floor(secondsRemaining / 60)}:${String(Math.floor(secondsRemaining % 60)).padStart(2, '0')}`,
+      btc: +this.lastBtcPrice.toFixed(0),
+      strike: +strike.toFixed(0),
+      vol: +(currentVol * 100).toFixed(0),
+      fairUp: +(fairValue.pUp * 100).toFixed(0),
+      fairDown: +(fairValue.pDown * 100).toFixed(0),
+      yesBid: +(this.lastOrderBook.yesBid * 100).toFixed(0),
+      yesAsk: +(this.lastOrderBook.yesAsk * 100).toFixed(0),
+      edgeYes: +(edgeYes * 100).toFixed(1),
+      edgeNo: +(edgeNo * 100).toFixed(1),
+      yesShares: pos.yesShares,
+      noShares: pos.noShares,
+      pnl: +pnl.toFixed(2),
+    });
   }
 
   /**

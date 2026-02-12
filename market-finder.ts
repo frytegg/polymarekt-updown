@@ -10,8 +10,13 @@
 
 const axios = require('axios');
 import { CryptoMarket } from './types';
+import { createLogger, rateLimitedLog } from './logger';
 
+const log = createLogger('MarketFinder');
 const GAMMA_API_URL = 'https://gamma-api.polymarket.com';
+
+// Track previous search result to detect changes
+let lastSearchResultKey: string = '';
 
 // Series slugs for crypto UP/DOWN markets
 const CRYPTO_SERIES = [
@@ -54,46 +59,46 @@ interface EventDetails {
  * Find active BTC UP/DOWN markets from series
  */
 export async function findCryptoMarkets(): Promise<CryptoMarket[]> {
-  console.log('🔍 Searching for BTC UP/DOWN markets...');
-  
+  log.debug('search.started');
+
   const markets: CryptoMarket[] = [];
-  
+
   for (const seriesSlug of CRYPTO_SERIES) {
     try {
       // Step 1: Get all events from series
       const seriesResponse = await axios.get(`${GAMMA_API_URL}/series`, {
         params: { slug: seriesSlug },
       });
-      
+
       const seriesData = seriesResponse.data;
       if (!seriesData || seriesData.length === 0) {
-        console.log(`   ⚠️ Series ${seriesSlug} not found`);
+        log.warn('search.series_not_found', { series: seriesSlug });
         continue;
       }
-      
+
       const series = seriesData[0];
       const events: SeriesEvent[] = series.events || [];
-      
+
       // Step 2: Filter for active (not closed) events
       const activeEvents = events.filter(e => !e.closed);
-      
+
       // Sort by endDate (soonest first)
-      activeEvents.sort((a, b) => 
+      activeEvents.sort((a, b) =>
         new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
       );
-      
-      console.log(`   📊 Series ${seriesSlug}: ${activeEvents.length} active events`);
-      
+
+      log.debug('search.series_result', { series: seriesSlug, activeCount: activeEvents.length });
+
       // Step 3: Get full details for nearest events (limit to avoid too many API calls)
       const eventsToFetch = activeEvents.slice(0, 5);
-      
+
       for (const event of eventsToFetch) {
         try {
           const eventDetails = await fetchEventDetails(event.id);
           if (!eventDetails || !eventDetails.markets || eventDetails.markets.length === 0) {
             continue;
           }
-          
+
           const market = parseEventToMarket(eventDetails);
           if (market) {
             markets.push(market);
@@ -102,24 +107,30 @@ export async function findCryptoMarkets(): Promise<CryptoMarket[]> {
           // Skip this event
         }
       }
-      
+
     } catch (error: any) {
-      console.error(`   ❌ Error fetching series ${seriesSlug}: ${error.message}`);
+      log.error('search.series_error', { series: seriesSlug, error: error.message?.slice(0, 120) });
     }
   }
-  
+
   // Sort by end date (soonest first)
   markets.sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
-  
-  console.log(`✅ Found ${markets.length} tradeable markets`);
-  
-  // Log found markets
-  for (const m of markets.slice(0, 3)) {
-    const timeLeft = Math.max(0, (m.endDate.getTime() - Date.now()) / 1000);
-    console.log(`   📊 ${m.question.slice(0, 50)}... (${Math.floor(timeLeft / 60)}m ${Math.floor(timeLeft % 60)}s left)`);
+
+  // Only log at INFO if results changed from last search (dedup repeated identical results)
+  const resultKey = markets.map(m => m.conditionId.slice(0, 8)).join(',');
+  if (resultKey !== lastSearchResultKey) {
+    lastSearchResultKey = resultKey;
+    log.info('search.result_changed', {
+      count: markets.length,
+      markets: markets.slice(0, 3).map(m => ({
+        q: m.question.slice(0, 40),
+        timeLeftSec: Math.max(0, Math.floor((m.endDate.getTime() - Date.now()) / 1000)),
+      })),
+    });
+  } else {
+    log.debug('search.result_unchanged', { count: markets.length });
   }
-  console.log();
-  
+
   return markets;
 }
 
@@ -252,39 +263,27 @@ export type { StrikePriceResult } from './strike-service';
 export { fetchStrikePrice, fetchChainlinkBTCPrice } from './strike-service';
 
 /**
- * Log market info
+ * Log market info (single structured line)
  */
 export function logMarket(market: CryptoMarket): void {
   const now = Date.now();
   const secondsRemaining = Math.max(0, (market.endDate.getTime() - now) / 1000);
-  const minutes = Math.floor(secondsRemaining / 60);
-  const seconds = Math.floor(secondsRemaining % 60);
-  
-  // Check if market has started (strike is known)
   const hasStarted = market.startTime.getTime() <= now;
   const secondsToStart = Math.max(0, (market.startTime.getTime() - now) / 1000);
-  
-  console.log(`📊 ${market.question}`);
-  console.log(`   ⏰ Expires in: ${minutes}m ${seconds}s`);
-  
-  if (!hasStarted) {
-    const startMin = Math.floor(secondsToStart / 60);
-    const startSec = Math.floor(secondsToStart % 60);
-    console.log(`   ⏳ Starts in: ${startMin}m ${startSec}s (strike not yet revealed)`);
-  } else if (market.strikePrice > 0) {
-    console.log(`   💰 Strike (Price to Beat): $${market.strikePrice.toLocaleString()}`);
-  } else {
-    console.log(`   💰 Strike: PENDING (capture at start)`);
-  }
-  
-  // Show live pricing
-  if (market.bestBid !== undefined && market.bestAsk !== undefined) {
-    const spread = ((market.bestAsk - market.bestBid) * 100).toFixed(0);
-    console.log(`   📈 Bid: ${(market.bestBid * 100).toFixed(0)}¢ | Ask: ${(market.bestAsk * 100).toFixed(0)}¢ | Spread: ${spread}¢`);
-  }
-  if (market.volume) {
-    console.log(`   💵 Volume: $${market.volume.toLocaleString()}`);
-  }
-  console.log(`   🔗 Resolution: ${market.resolutionSource || 'Chainlink'}`);
-  console.log();
+
+  log.debug('market.details', {
+    marketId: market.conditionId.slice(0, 12),
+    question: market.question.slice(0, 50),
+    expiresInSec: Math.floor(secondsRemaining),
+    hasStarted,
+    secondsToStart: hasStarted ? undefined : Math.floor(secondsToStart),
+    strike: market.strikePrice > 0 ? market.strikePrice : 'pending',
+    bestBid: market.bestBid,
+    bestAsk: market.bestAsk,
+    spreadCents: market.bestBid !== undefined && market.bestAsk !== undefined
+      ? Math.round((market.bestAsk - market.bestBid) * 100)
+      : undefined,
+    volume: market.volume || undefined,
+    resolution: market.resolutionSource || 'Chainlink',
+  });
 }

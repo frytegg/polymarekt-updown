@@ -8,6 +8,7 @@
 const axios = require('axios');
 import { ethers } from 'ethers';
 import { CryptoMarket } from './types';
+import { createLogger, Logger, safeErrorData } from './logger';
 
 // =============================================================================
 // CONSTANTS
@@ -33,11 +34,14 @@ export interface StrikePriceResult {
 // STRIKE PRICE SERVICE CLASS
 // =============================================================================
 
+const strikeLog = createLogger('StrikeService');
+
 export class StrikePriceService {
   private currentStrike: number = 0;
   private strikeSetTime: number = 0;
   private strikeSource: 'polymarket' | 'chainlink' | 'manual' | null = null;
   private fetchInProgress: boolean = false;
+  private log: Logger = strikeLog;
 
   /**
    * Get the current strike price (0 if not set)
@@ -73,13 +77,11 @@ export class StrikePriceService {
     this.strikeSetTime = Date.now();
     this.strikeSource = 'manual';
     
-    if (oldStrike > 0) {
-      console.log(`\n🔄 STRIKE UPDATED: $${oldStrike.toFixed(2)} → $${price.toFixed(2)}`);
-      console.log(`   📊 Using Polymarket's "Price to Beat" now\n`);
-    } else {
-      console.log(`\n⚡ STRIKE (Manual): $${price.toFixed(2)}`);
-      console.log(`   ✅ Using manually provided strike\n`);
-    }
+    this.log.info('strike.set', {
+      price,
+      previousPrice: oldStrike > 0 ? oldStrike : undefined,
+      source: 'manual',
+    });
   }
 
   /**
@@ -102,38 +104,32 @@ export class StrikePriceService {
         this.currentStrike = manualStrike;
         this.strikeSetTime = Date.now();
         this.strikeSource = 'manual';
-        console.log(`\n⚡ STRIKE (Manual): $${this.currentStrike.toFixed(2)}`);
-        console.log(`   ✅ Using ARB_STRIKE from environment\n`);
+        this.log.info('strike.set', { price: this.currentStrike, source: 'manual_env' });
         return true;
       }
 
       // Try to fetch from Polymarket API (falls back to Chainlink)
-      console.log(`🔍 Fetching strike...`);
-      
+      this.log.debug('strike.fetching');
+
       const result = await this.fetchStrikePrice(market);
-      
+
       if (result && result.price > 0) {
         this.currentStrike = result.price;
         this.strikeSetTime = Date.now();
         this.strikeSource = result.source;
-        
-        // Format the price time
-        const timeStr = result.priceTime.toLocaleTimeString('fr-FR', { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          second: '2-digit' 
+
+        this.log.info('strike.set', {
+          price: this.currentStrike,
+          source: result.source,
+          priceTime: result.priceTime.toISOString(),
         });
-        
-        const sourceIcon = result.source === 'polymarket' ? '🎯' : '⚡';
-        console.log(`${sourceIcon} STRIKE: $${this.currentStrike.toFixed(2)} @ ${timeStr} (${result.source}) ✅`);
         return true;
       } else {
-        console.log(`❌ Strike fetch failed, will retry...`);
+        this.log.warn('strike.fetch_failed', { reason: 'no_valid_result' });
         return false;
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      console.log(`❌ Strike error: ${msg.slice(0, 50)}`);
+      this.log.warn('strike.fetch_error', safeErrorData(err));
       return false;
     } finally {
       this.fetchInProgress = false;
@@ -178,13 +174,7 @@ export class StrikePriceService {
       
       return null;
     } catch (error: any) {
-      console.log(`❌ Polymarket: ${(error.message || 'Unknown').slice(0, 40)}`);
-      if (error.config?.url) {
-        console.log(`    URL: ${error.config.url}`);
-      }
-      if (error.response?.data) {
-        console.log(`    Response: ${JSON.stringify(error.response.data)}`);
-      }
+      this.log.warn('strike.polymarket_error', safeErrorData(error));
       return null;
     }
   }
@@ -209,7 +199,7 @@ export class StrikePriceService {
       
       return { price, priceTime, source: 'chainlink' };
     } catch (err: any) {
-      console.log(`❌ Chainlink: ${(err.message || 'Unknown').slice(0, 40)}`);
+      this.log.warn('strike.chainlink_error', safeErrorData(err));
       return null;
     }
   }
@@ -225,9 +215,9 @@ export class StrikePriceService {
     if (polymarketResult) {
       return polymarketResult;
     }
-    
+
     // Fallback to Chainlink current price
-    console.log(`   ⚠️ Polymarket API failed, using Chainlink current price as fallback`);
+    this.log.info('strike.fallback_chainlink');
     return this.fetchChainlinkBTCPrice();
   }
 }
@@ -245,18 +235,18 @@ export async function fetchChainlinkBTCPrice(): Promise<StrikePriceResult | null
     const rpcUrl = process.env.RPC_URL || "https://polygon.drpc.org";
     const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
     const contract = new ethers.Contract(CHAINLINK_BTC_USD_POLYGON, CHAINLINK_ABI, provider);
-    
+
     const [, answer, , updatedAt] = await contract.latestRoundData();
     const price = parseFloat(ethers.utils.formatUnits(answer, 8));
-    
+
     if (price <= 0) return null;
-    
+
     // updatedAt is a Unix timestamp (seconds)
     const priceTime = new Date(updatedAt.toNumber() * 1000);
-    
+
     return { price, priceTime, source: 'chainlink' };
   } catch (err: any) {
-    console.log(`❌ Chainlink: ${(err.message || 'Unknown').slice(0, 40)}`);
+    strikeLog.warn('strike.chainlink_error', safeErrorData(err));
     return null;
   }
 }

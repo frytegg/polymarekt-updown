@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger, Logger, safeErrorData } from './logger';
 
 // =============================================================================
 // TYPES
@@ -125,6 +126,7 @@ class PaperTradingTracker {
   private nextResolutionId: number = 1;
   private logFile: string;
   private dataDir: string;
+  private log: Logger = createLogger('PaperTracker');
 
   // Callbacks for Telegram notifications (set by telegram.ts)
   public onTradeOpened?: (trade: PaperTrade) => void;
@@ -287,13 +289,16 @@ class PaperTradingTracker {
       }
     }
 
-    // Console log
-    const emoji = isWin ? '🟢' : '🔴';
-    console.log(
-      `[TRACKER] Resolution #${resolution.id}: ${position.side} ${isWin ? 'WON' : 'LOST'} | ` +
-      `${position.shares} shares @ ${(position.avgPrice * 100).toFixed(1)}¢ | ` +
-      `${emoji} P&L: $${pnl.toFixed(2)}`
-    );
+    this.log.info('resolution.position_resolved', {
+      resolutionId: resolution.id,
+      marketId: position.marketId.slice(0, 12),
+      side: position.side,
+      outcome: isWin ? 'WIN' : 'LOSS',
+      shares: position.shares,
+      avgPrice: position.avgPrice,
+      pnl: parseFloat(pnl.toFixed(2)),
+      payout,
+    });
   }
 
   /**
@@ -370,44 +375,42 @@ class PaperTradingTracker {
   }
 
   /**
-   * Log trade to console
+   * Log trade recorded
    */
   private logTrade(trade: PaperTrade): void {
-    const adjMethod = trade.adjustmentMethod === 'ema' ? 'EMA' : 'STATIC';
-    console.log(
-      `\n[TRADE #${trade.id}] BUY ${trade.size} ${trade.side} @ ${(trade.price * 100).toFixed(1)}¢ | ` +
-      `Edge: +${(trade.edge * 100).toFixed(1)}% | ` +
-      `Cost: $${trade.cost.toFixed(2)} | ` +
-      `Max Profit: $${trade.maxProfit.toFixed(2)} | ` +
-      `Adj: $${trade.adjustment.toFixed(0)} (${adjMethod})`
-    );
+    this.log.info('trade.recorded', {
+      tradeId: trade.id,
+      marketId: trade.marketId.slice(0, 12),
+      side: trade.side,
+      price: trade.price,
+      size: trade.size,
+      edge: parseFloat((trade.edge * 100).toFixed(1)),
+      cost: parseFloat(trade.cost.toFixed(2)),
+      maxProfit: parseFloat(trade.maxProfit.toFixed(2)),
+      adjustment: parseFloat(trade.adjustment.toFixed(0)),
+      adjustmentMethod: trade.adjustmentMethod,
+    });
   }
 
   /**
-   * Print summary (console + optional callback)
+   * Print summary (structured log + optional callback)
    */
   printSummary(): void {
     const stats = this.getStats();
 
-    console.log('\n============ TRADING SUMMARY ============');
-    console.log(`Total Trades:     ${stats.totalTrades} (${stats.openTrades} open, ${stats.resolvedTrades} resolved)`);
-    console.log(`Realized P&L:     $${stats.realizedPnL.toFixed(2)}`);
-    console.log(`Total Fees:       $${stats.totalFeesPaid.toFixed(2)}`);
-    console.log(`Win Rate:         ${(stats.winRate * 100).toFixed(1)}% (${stats.winCount}W / ${stats.lossCount}L)`);
-    console.log(`Avg Edge:         ${(stats.avgEdge * 100).toFixed(1)}%`);
-
-    if (stats.openPositions.length > 0) {
-      console.log(`\n--- Open Positions (${stats.openPositions.length}) ---`);
-      console.log(`Capital at Risk:  $${stats.capitalAtRisk.toFixed(2)}`);
-      console.log(`If all WIN:       +$${stats.potentialProfit.toFixed(2)}`);
-      console.log(`If all LOSE:      -$${stats.potentialLoss.toFixed(2)}`);
-
-      for (const pos of stats.openPositions) {
-        const tradeIdsStr = pos.tradeIds?.join(', ') ?? 'unknown';
-        console.log(`  ${pos.side}: ${pos.shares} @ ${(pos.avgPrice * 100).toFixed(1)}¢ | Cost: $${pos.totalCost.toFixed(2)} | Trades: ${tradeIdsStr}`);
-      }
-    }
-    console.log('=========================================\n');
+    this.log.info('summary.stats', {
+      totalTrades: stats.totalTrades,
+      openTrades: stats.openTrades,
+      resolvedTrades: stats.resolvedTrades,
+      realizedPnL: parseFloat(stats.realizedPnL.toFixed(2)),
+      totalFees: parseFloat(stats.totalFeesPaid.toFixed(2)),
+      winRate: parseFloat((stats.winRate * 100).toFixed(1)),
+      wins: stats.winCount,
+      losses: stats.lossCount,
+      avgEdge: parseFloat((stats.avgEdge * 100).toFixed(1)),
+      capitalAtRisk: parseFloat(stats.capitalAtRisk.toFixed(2)),
+      openPositionCount: stats.openPositions.length,
+    });
 
     // Notify via callback
     if (this.onSummaryRequested) {
@@ -440,7 +443,7 @@ class PaperTradingTracker {
 
       fs.writeFileSync(this.logFile, JSON.stringify(data, null, 2));
     } catch (err: any) {
-      console.error(`[TRACKER] Save failed: ${err.message}`);
+      this.log.error('file.save_error', { error: err.message?.slice(0, 100) });
     }
   }
 
@@ -522,7 +525,7 @@ class PaperTradingTracker {
           // Keep expired positions — checkAndResolveExpired() will resolve them properly
           // (Previously these were dropped on load, orphaning trades as permanently "open")
           if (marketEndTime > 0 && marketEndTime < now) {
-            console.log(`[TRACKER] Keeping expired position for resolution (ended ${new Date(marketEndTime).toISOString()})`);
+            this.log.debug('file.expired_position_kept', { marketId: pos.marketId?.slice(0, 12), endedAt: new Date(marketEndTime).toISOString() });
           }
 
           this.positions.set(pos.tokenId, {
@@ -551,11 +554,13 @@ class PaperTradingTracker {
         this.nextTradeId = data.meta?.nextTradeId || this.trades.length + 1;
         this.nextResolutionId = data.meta?.nextResolutionId || this.resolutions.length + 1;
 
-        const loadMsg = `[TRACKER] Loaded ${this.trades.length} trades, ${this.positions.size} positions`;
-        const skipMsg = skippedTrades > 0 || skippedPositions > 0
-          ? ` (skipped ${skippedTrades} invalid trades, ${skippedPositions} stale/invalid positions)`
-          : '';
-        console.log(loadMsg + skipMsg);
+        this.log.info('startup.loaded', {
+          trades: this.trades.length,
+          positions: this.positions.size,
+          resolutions: this.resolutions.length,
+          skippedTrades: skippedTrades > 0 ? skippedTrades : undefined,
+          skippedPositions: skippedPositions > 0 ? skippedPositions : undefined,
+        });
 
         // Resave if we migrated/cleaned data
         if (skippedTrades > 0 || skippedPositions > 0) {
@@ -563,7 +568,7 @@ class PaperTradingTracker {
         }
       }
     } catch (err: any) {
-      console.error(`[TRACKER] Load failed: ${err.message}`);
+      this.log.error('file.load_error', { error: err.message?.slice(0, 100) });
     }
   }
 
@@ -576,25 +581,23 @@ class PaperTradingTracker {
     const now = Date.now();
     const positions = Array.from(this.positions.values());
 
-    if (positions.length > 0) {
-      const expired = positions.filter(p => p.marketEndTime > 0 && p.marketEndTime + 120_000 <= now);
-      if (expired.length > 0) {
-        console.log(`[TRACKER] Checking ${expired.length} expired position(s) for resolution...`);
-      }
+    const expired = positions.filter(p => p.marketEndTime > 0 && p.marketEndTime + 120_000 <= now);
+    if (expired.length > 0) {
+      this.log.debug('resolution.checking_expired', { count: expired.length });
     }
 
     for (const pos of positions) {
       // Only check positions past their expiry + 2 min buffer
       if (pos.marketEndTime <= 0 || pos.marketEndTime + 120_000 > now) continue;
 
+      const marketId = pos.marketId.slice(0, 12);
       try {
-        console.log(`[TRACKER] Fetching outcome for ${pos.side} position in ${pos.marketId.slice(0, 18)}...`);
+        this.log.debug('resolution.fetching_outcome', { marketId, side: pos.side });
         const outcome = await this.fetchMarketOutcome(pos.marketId);
         if (outcome) {
-          console.log(`[TRACKER] Market resolved: ${outcome} — triggering redemption`);
+          this.log.info('resolution.market_resolved', { marketId, outcome });
 
           // Determine YES/NO token IDs from position
-          // We track by tokenId, so we need to resolve by iterating all positions for this market
           const allPositionsForMarket = positions.filter(p => p.marketId === pos.marketId);
           const yesPos = allPositionsForMarket.find(p => p.side === 'YES');
           const noPos = allPositionsForMarket.find(p => p.side === 'NO');
@@ -611,13 +614,13 @@ class PaperTradingTracker {
           if (this.onRedemptionNeeded) {
             this.onRedemptionNeeded(pos.marketId, yesPos?.tokenId, noPos?.tokenId);
           } else {
-            console.log(`[TRACKER] No redemption callback set — skipping on-chain redeem`);
+            this.log.debug('resolution.no_redemption_callback', { marketId });
           }
         } else {
-          console.log(`[TRACKER] Market ${pos.marketId.slice(0, 18)}... not resolved yet on CLOB API`);
+          this.log.debug('resolution.not_yet_resolved', { marketId });
         }
       } catch (err: any) {
-        console.log(`[TRACKER] Resolution check failed for ${pos.marketId.slice(0, 18)}...: ${err.message?.slice(0, 60)}`);
+        this.log.warn('resolution.check_failed', { marketId, error: err.message?.slice(0, 80) });
       }
     }
   }
@@ -634,7 +637,7 @@ class PaperTradingTracker {
       );
 
       if (!response.ok) {
-        console.log(`[TRACKER] Market lookup failed: HTTP ${response.status} for ${conditionId.slice(0, 18)}...`);
+        this.log.warn('resolution.lookup_failed', { marketId: conditionId.slice(0, 12), httpStatus: response.status });
         return null;
       }
 
@@ -660,12 +663,12 @@ class PaperTradingTracker {
 
       // Market is closed but outcome not determinable yet
       if (market.closed) {
-        console.log(`[TRACKER] Market closed but outcome unclear: ${conditionId.slice(0, 18)}...`);
+        this.log.debug('resolution.outcome_unclear', { marketId: conditionId.slice(0, 12) });
       }
 
       return null;
     } catch (err: any) {
-      console.log(`[TRACKER] Resolution check error: ${err.message?.slice(0, 80)}`);
+      this.log.warn('resolution.fetch_error', { marketId: conditionId.slice(0, 12), error: err.message?.slice(0, 80) });
       return null;
     }
   }

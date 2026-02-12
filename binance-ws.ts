@@ -8,6 +8,7 @@
 const WebSocket = require('ws');
 const axios = require('axios');
 import { BinancePrice, PriceCallback } from './types';
+import { createLogger, rateLimitedLog, safeErrorData, Logger } from './logger';
 
 // Try multiple endpoints in order of preference
 const BINANCE_WS_URLS = [
@@ -37,6 +38,8 @@ export class BinanceWebSocket {
   private currentWsUrlIndex = 0;
   private currentRestUrlIndex = 0;
   private wsBlocked = false;
+  private log: Logger = createLogger('BinanceWS');
+  private wsConnId = 0;
 
   constructor(symbol: string = 'btcusdt') {
     this.symbol = symbol.toLowerCase();
@@ -60,12 +63,13 @@ export class BinanceWebSocket {
     const wsUrl = BINANCE_WS_URLS[this.currentWsUrlIndex];
     const streamUrl = `${wsUrl}/${this.symbol}@bookTicker`;
     
-    console.log(`🔌 Connecting to Binance WS (bookTicker): ${this.symbol.toUpperCase()}...`);
-    
+    this.wsConnId++;
+    this.log.info('ws.connecting', { symbol: this.symbol.toUpperCase(), wsConnId: this.wsConnId, urlIndex: this.currentWsUrlIndex });
+
     try {
       this.ws = new WebSocket(streamUrl);
     } catch (err: any) {
-      console.error(`❌ Failed to create WebSocket: ${err.message}`);
+      this.log.error('ws.create_failed', { ...safeErrorData(err), wsConnId: this.wsConnId });
       this.handleWsFailure();
       return;
     }
@@ -73,7 +77,7 @@ export class BinanceWebSocket {
     const ws = this.ws;
     
     ws.on('open', () => {
-      console.log(`✅ Binance WS connected: ${this.symbol.toUpperCase()}`);
+      this.log.info('ws.connected', { symbol: this.symbol.toUpperCase(), wsConnId: this.wsConnId });
       this.reconnectAttempts = 0;
       this.usingRestFallback = false;
       this.stopRestPolling();
@@ -110,18 +114,21 @@ export class BinanceWebSocket {
       }
     });
     
-    ws.on('error', (error) => {
+    ws.on('error', (error: any) => {
       const msg = error.message || '';
-      console.error(`❌ Binance WS error: ${msg}`);
-      
+      rateLimitedLog(this.log, 'error', 'binance_ws_error', 60_000, 'ws.error', {
+        error: msg.slice(0, 120),
+        wsConnId: this.wsConnId,
+      });
+
       // HTTP 451 = geo-blocked, switch to REST immediately
       if (msg.includes('451') || msg.includes('403') || msg.includes('Unexpected server response')) {
         this.handleWsFailure();
       }
     });
     
-    ws.on('close', (code, reason) => {
-      console.log(`⚠️ Binance WS disconnected (code: ${code})`);
+    ws.on('close', (code: number) => {
+      this.log.warn('ws.disconnected', { code, wsConnId: this.wsConnId });
       this.clearPingInterval();
       
       // If we've failed multiple times, mark WS as blocked
@@ -146,15 +153,14 @@ export class BinanceWebSocket {
     // Try next WS URL
     this.currentWsUrlIndex++;
     if (this.currentWsUrlIndex < BINANCE_WS_URLS.length) {
-      console.log(`🔄 Trying alternative Binance WS endpoint...`);
+      this.log.info('ws.trying_alternative', { urlIndex: this.currentWsUrlIndex });
       this.reconnectAttempts = 0;
       setTimeout(() => this.connectWebSocket(), 1000);
       return;
     }
-    
+
     // All WS URLs failed - switch to REST
-    console.log(`\n⚠️ All Binance WebSocket endpoints blocked!`);
-    console.log(`🔄 Switching to REST API polling (1s interval)...\n`);
+    this.log.warn('ws.all_blocked', { triedUrls: BINANCE_WS_URLS.length });
     this.wsBlocked = true;
     this.startRestPolling();
   }
@@ -166,7 +172,7 @@ export class BinanceWebSocket {
     if (this.restPollingInterval) return; // Already polling
     
     this.usingRestFallback = true;
-    console.log(`📡 Starting Binance REST polling...`);
+    this.log.info('rest.polling_started', { intervalMs: 1000 });
     
     // Fetch immediately, then every second
     this.fetchRestPrice();
@@ -224,9 +230,11 @@ export class BinanceWebSocket {
         if (this.currentRestUrlIndex >= BINANCE_REST_URLS.length) {
           this.currentRestUrlIndex = 0; // Cycle back
         }
-        console.log(`⚠️ REST endpoint blocked, trying next...`);
+        rateLimitedLog(this.log, 'warn', 'binance_rest_blocked', 60_000, 'rest.endpoint_blocked', {
+          httpStatus: status,
+          nextUrlIndex: this.currentRestUrlIndex,
+        });
       }
-      // Don't log every error - too spammy
     }
   }
 
@@ -289,7 +297,7 @@ export class BinanceWebSocket {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
     
-    console.log(`🔄 Reconnecting to Binance WS in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    this.log.info('ws.reconnecting', { delayMs: delay, attempt: this.reconnectAttempts, maxAttempts: this.maxReconnectAttempts });
     
     setTimeout(() => {
       this.connectWebSocket();
