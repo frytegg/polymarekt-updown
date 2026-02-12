@@ -24,9 +24,9 @@ import { DeribitVolFetcher } from '../fetchers/deribit-vol';
 import { ChainlinkHistoricalFetcher, ChainlinkPricePoint } from '../fetchers/chainlink-historical';
 import { OrderMatcher } from './order-matcher';
 import { PositionTracker } from './position-tracker';
-import { BlackScholesStrategy } from '../../strategies';
+import { BlackScholesStrategy } from '../../core/strategies';
 import { DivergenceCalculator } from './divergence-calculator';
-import { createLogger } from '../../logger';
+import { createLogger } from '../../core/logger';
 import { calculateRealizedVol as coreCalculateRealizedVol } from '../../core/vol-calculator';
 
 const DEFAULT_CONFIG: BacktestConfig = {

@@ -7,8 +7,8 @@
 
 const axios = require('axios');
 import { ethers } from 'ethers';
-import { CryptoMarket } from './types';
-import { createLogger, Logger, safeErrorData } from './logger';
+import { CryptoMarket } from './core/types';
+import { createLogger, Logger, safeErrorData } from './core/logger';
 
 // =============================================================================
 // CONSTANTS

@@ -5,7 +5,7 @@
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const TelegramBot = require('node-telegram-bot-api');
-import { loadArbConfig, ArbConfig } from './config';
+import { loadArbConfig, ArbConfig } from './core/config';
 import { paperTracker, PaperTrade, PaperStats, ResolutionRecord } from './trade-persistence';
 
 let bot: any = null;

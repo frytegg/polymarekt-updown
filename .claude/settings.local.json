@@ -55,7 +55,9 @@
       "WebFetch(domain:phemex.com)",
       "WebFetch(domain:www.ainvest.com)",
       "WebFetch(domain:quantjourney.substack.com)",
-      "WebFetch(domain:www.financemagnates.com)"
+      "WebFetch(domain:www.financemagnates.com)",
+      "Bash(git mv:*)",
+      "Bash(find:*)"
     ]
   }
 }

@@ -18,7 +18,7 @@ import { PolymarketPricesFetcher } from './fetchers/polymarket-prices';
 import { DeribitVolFetcher } from './fetchers/deribit-vol';
 import { OrderMatcher } from './engine/order-matcher';
 import { PositionTracker } from './engine/position-tracker';
-import { calculateFairValue } from '../fair-value';
+import { calculateFairValue } from '../core/fair-value';
 
 // =============================================================================
 // TYPES

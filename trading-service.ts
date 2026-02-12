@@ -7,7 +7,7 @@
 
 import { ClobClient, Side, Chain, OrderType } from '@polymarket/clob-client';
 import { Wallet } from 'ethers';
-import { loadArbConfig } from './config';
+import { loadArbConfig } from './core/config';
 
 // =============================================================================
 // TYPES

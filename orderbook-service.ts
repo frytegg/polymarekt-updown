@@ -6,7 +6,7 @@
  */
 
 const axios = require('axios');
-import { OrderBookState } from './types';
+import { OrderBookState } from './core/types';
 
 // =============================================================================
 // TYPES

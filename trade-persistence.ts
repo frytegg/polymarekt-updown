@@ -8,7 +8,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { createLogger, Logger, safeErrorData } from './logger';
+import { createLogger, Logger, safeErrorData } from './core/logger';
 import { calculatePolymarketFee } from './core/fees';
 
 // =============================================================================

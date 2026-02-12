@@ -3,7 +3,7 @@
  * Diagnostic script for fair value calculation
  */
 
-import { calculateFairValue, calculateFairValueSimple, MODEL_PARAMS } from '../fair-value';
+import { calculateFairValue, calculateFairValueSimple, MODEL_PARAMS } from '../core/fair-value';
 
 // =============================================================================
 // MANUAL CALCULATION

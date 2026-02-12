@@ -10,11 +10,11 @@
 import * as dotenv from 'dotenv';
 import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 
-import { loadArbConfig, validateArbConfig, logArbConfig, ArbConfig } from './config';
+import { loadArbConfig, validateArbConfig, logArbConfig, ArbConfig } from './core/config';
 import { BinanceWebSocket } from './binance-ws';
 import { findCryptoMarkets, findNextMarket, logMarket } from './market-finder';
 import { ArbTrader } from './arb-trader';
-import { CryptoMarket, OrderBookState } from './types';
+import { CryptoMarket, OrderBookState } from './core/types';
 import { OrderbookService, getDefaultOrderBookState } from './orderbook-service';
 import { ResolutionTracker } from './resolution-tracker';
 import { TradingService } from './trading-service';

@@ -9,7 +9,7 @@
  * These are intentionally separate — see ARCHITECTURE-AUDIT.md §2.1.
  */
 
-import { Position, OrderBookState } from './types';
+import { Position, OrderBookState } from './core/types';
 
 // =============================================================================
 // TYPES
