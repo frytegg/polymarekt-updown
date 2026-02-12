@@ -1,11 +1,11 @@
 /**
  * Crypto Pricer Arb - Binance Price Client
  * Real-time BTC price feed from Binance (WebSocket + REST fallback)
- * 
+ *
  * Falls back to REST polling if WebSocket is geo-blocked (HTTP 451)
  */
 
-const WebSocket = require('ws');
+import WebSocket from 'ws';
 const axios = require('axios');
 import { BinancePrice, PriceCallback } from '../core/types';
 import { createLogger, rateLimitedLog, safeErrorData, Logger } from '../core/logger';
@@ -90,7 +90,7 @@ export class BinanceWebSocket {
       }, 30000);
     });
     
-    ws.on('message', (data: WebSocket.Data) => {
+    ws.on('message', (data: WebSocket.RawData) => {
       try {
         const msg = JSON.parse(data.toString());
         
