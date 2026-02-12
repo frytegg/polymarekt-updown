@@ -683,6 +683,11 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             const result = await simulator.run();
             const stats = calculateStatistics(result);
             
+            // Calculate ROI: use capital-based if finite, otherwise share-based
+            const roi = result.initialCapital !== Infinity
+                ? result.totalPnL / result.initialCapital
+                : stats.avgRealizedEdge;
+
             results.push({
                 edge,
                 pnl: result.totalPnL,
@@ -691,7 +696,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
                 winRate: stats.winRate,
                 avgEdge: stats.avgEdgeAtTrade,
                 sharpe: stats.sharpeRatio,
-                roi: stats.avgRealizedEdge,
+                roi,
                 totalFees: result.totalFeesPaid,
             });
 
@@ -874,6 +879,24 @@ async function main(): Promise<void> {
 
         // Summary statistics
         printStatistics(stats);
+
+        // Capital metrics (only if initialCapital is finite)
+        if (result.initialCapital !== Infinity) {
+            console.log('\n💰 Capital Metrics');
+            console.log('─'.repeat(60));
+            const roi = (result.totalPnL / result.initialCapital) * 100;
+            const roiStr = roi >= 0 ? `+${roi.toFixed(1)}%` : `${roi.toFixed(1)}%`;
+            const roiEmoji = roi >= 0 ? '🟢' : '🔴';
+            console.log(`${roiEmoji} ROI:                  ${roiStr}`);
+            console.log(`   Initial Capital:      $${result.initialCapital.toFixed(2)}`);
+            console.log(`   Final Capital:        $${result.finalCapital.toFixed(2)}`);
+            console.log(`   Peak Deployed:        $${result.peakDeployedCapital.toFixed(2)} (${(result.capitalUtilization * 100).toFixed(1)}% utilization)`);
+
+            if (result.initialCapital > 0) {
+                const maxDDPct = (result.maxDrawdown / result.initialCapital) * 100;
+                console.log(`   Max Drawdown:         $${result.maxDrawdown.toFixed(2)} (${maxDDPct.toFixed(1)}% of capital)`);
+            }
+        }
 
         // P&L curve
         if (result.pnlCurve.length > 0) {
