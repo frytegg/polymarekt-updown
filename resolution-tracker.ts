@@ -1,12 +1,12 @@
 /**
  * Resolution Tracker
- * 
- * Tracks market resolutions and calculates post-resolution statistics.
- * Sends Telegram notifications when markets resolve.
+ *
+ * Tracks market resolutions and calculates post-resolution edge statistics.
+ * Outcome is determined via Polymarket CLOB API (on-chain settlement source).
+ * Telegram notifications are handled by paper-trading-tracker callbacks.
  */
 
-const axios = require('axios');
-import { sendNotification } from './telegram';
+import { createLogger, Logger } from './logger';
 
 // =============================================================================
 // TYPES
@@ -78,12 +78,13 @@ export interface ResolutionStats {
 
 export class ResolutionTracker {
   private pendingResolutions: PendingResolution[] = [];
-  private notifiedMarkets: Set<string> = new Set();
+  private resolvedConditions: Set<string> = new Set();
   private resolvedTrades: ResolvedTradeResult[] = [];
   private resolvedMarkets: number = 0;
   private isCheckingResolutions: boolean = false;
   private lastStatsLog: number = 0;
   private statsLogInterval: number;
+  private log: Logger = createLogger('ResolutionTracker');
 
   /**
    * @param statsLogIntervalMs - Interval between automatic stats logging (default: 10 minutes)
@@ -96,14 +97,18 @@ export class ResolutionTracker {
    * Add a pending resolution to track
    */
   addPendingResolution(resolution: PendingResolution): void {
-    // Skip if already tracking this market
-    const alreadyTracking = this.pendingResolutions.some(
+    // Skip if already tracking or already resolved
+    const isDuplicate = this.pendingResolutions.some(
       p => p.conditionId === resolution.conditionId
-    );
-    
-    if (!alreadyTracking) {
+    ) || this.resolvedConditions.has(resolution.conditionId);
+
+    if (!isDuplicate) {
       this.pendingResolutions.push(resolution);
-      console.log(`📋 Tracking resolution for ${resolution.question.slice(0, 30)}... (${resolution.trades.length} trades)`);
+      this.log.info('resolution.tracking', {
+        marketId: resolution.conditionId.slice(0, 12),
+        question: resolution.question.slice(0, 40),
+        tradeCount: resolution.trades.length,
+      });
     }
   }
 
@@ -122,7 +127,8 @@ export class ResolutionTracker {
   }
 
   /**
-   * Check pending resolutions and send Telegram notifications
+   * Check pending resolutions via CLOB API (on-chain settlement)
+   * Telegram notifications are handled by paper-trading-tracker callbacks.
    */
   async checkResolutions(): Promise<void> {
     // Prevent concurrent checks
@@ -135,38 +141,27 @@ export class ResolutionTracker {
       for (let i = this.pendingResolutions.length - 1; i >= 0; i--) {
         const pending = this.pendingResolutions[i];
 
-        // Skip if already notified (prevent duplicates)
-        if (this.notifiedMarkets.has(pending.conditionId)) {
-          this.pendingResolutions.splice(i, 1);
-          continue;
-        }
+        // Only check if market ended at least 2 minutes ago (CLOB API needs time)
+        if (Date.now() < pending.endTime + 120_000) continue;
 
-        // Only check if market ended at least 1 minute ago
-        if (Date.now() < pending.endTime + 60000) continue;
-
-        // Mark as notified BEFORE sending to prevent race conditions
-        this.notifiedMarkets.add(pending.conditionId);
+        const marketId = pending.conditionId.slice(0, 12);
 
         try {
-          // Fetch current BTC price to determine outcome
-          const btcRes = await axios.get('https://api.binance.com/api/v3/ticker/price', {
-            params: { symbol: 'BTCUSDT' },
-          });
-          const finalBtc = parseFloat(btcRes.data.price);
-          const outcome = finalBtc > pending.strike ? 'UP' : 'DOWN';
+          const outcome = await this.fetchMarketOutcome(pending.conditionId);
 
-          // Calculate PnL
-          const totalCost = pending.yesCost + pending.noCost;
-          const payout = outcome === 'UP' ? pending.yesShares : pending.noShares;
-          const pnl = payout - totalCost;
-          
-          // Track per-trade realized returns (like backtest)
+          if (!outcome) {
+            // Not resolved yet on CLOB — will retry next cycle
+            this.log.debug('resolution.not_yet_resolved', { marketId });
+            continue;
+          }
+
+          // Track per-trade realized returns (edge analysis)
           for (const trade of pending.trades) {
             const won = (trade.side === 'YES' && outcome === 'UP') ||
                         (trade.side === 'NO' && outcome === 'DOWN');
             const tradePayout = won ? 1 : 0;
             const realizedReturn = tradePayout - trade.price;
-            
+
             this.resolvedTrades.push({
               side: trade.side,
               price: trade.price,
@@ -177,33 +172,71 @@ export class ResolutionTracker {
             });
           }
           this.resolvedMarkets++;
+          this.resolvedConditions.add(pending.conditionId);
 
-          // Send notification
-          const msg = 
-            `PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}\n`+
-            `${pending.question}\n` +
-            `Result: ${outcome} - Position: ${pending.yesShares} YES / ${pending.noShares} NO\n` +
-            `Cost: $${totalCost.toFixed(2)} - Payout: $${payout.toFixed(2)}`;
+          const totalCost = pending.yesCost + pending.noCost;
+          const payout = outcome === 'UP' ? pending.yesShares : pending.noShares;
+          const pnl = payout - totalCost;
 
-          await sendNotification(msg);
-          console.log(`\n📱 Telegram: ${outcome} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+          this.log.info('resolution.resolved', {
+            marketId, outcome,
+            pnl: +pnl.toFixed(2),
+            tradeCount: pending.trades.length,
+          });
 
           // Remove from pending
           this.pendingResolutions.splice(i, 1);
-          
-          // Log resolution stats periodically
+
+          // Log edge analysis stats periodically
           const now = Date.now();
           if (now - this.lastStatsLog > this.statsLogInterval && this.resolvedTrades.length >= 3) {
             this.logStats();
             this.lastStatsLog = now;
           }
-        } catch (err) {
-          // Error sending - already marked as notified so won't retry
+        } catch (err: any) {
+          this.log.warn('resolution.check_error', { marketId, error: err.message?.slice(0, 80) });
         }
       }
     } finally {
       this.isCheckingResolutions = false;
     }
+  }
+
+  /**
+   * Fetch market outcome from Polymarket CLOB API (on-chain settlement).
+   * Returns 'UP' or 'DOWN' if resolved, null if not yet resolved.
+   */
+  private async fetchMarketOutcome(conditionId: string): Promise<'UP' | 'DOWN' | null> {
+    const response = await fetch(
+      `https://clob.polymarket.com/markets/${conditionId}`
+    );
+
+    if (!response.ok) {
+      this.log.warn('resolution.lookup_failed', { marketId: conditionId.slice(0, 12), httpStatus: response.status });
+      return null;
+    }
+
+    const market = await response.json() as any;
+
+    // Not resolved yet
+    if (!market.closed && market.active !== false) return null;
+
+    // Check tokens[].winner field (most reliable)
+    const tokens = market.tokens || [];
+    if (tokens.length >= 2) {
+      if (tokens[0]?.winner === true) return 'UP';
+      if (tokens[1]?.winner === true) return 'DOWN';
+    }
+
+    // Fallback: check token prices after resolution
+    if (tokens.length >= 2) {
+      const yesPrice = parseFloat(tokens[0]?.price ?? '0');
+      const noPrice = parseFloat(tokens[1]?.price ?? '0');
+      if (yesPrice > 0.9) return 'UP';
+      if (noPrice > 0.9) return 'DOWN';
+    }
+
+    return null;
   }
 
   /**
@@ -254,56 +287,22 @@ export class ResolutionTracker {
   }
   
   /**
-   * Log resolution statistics to console
+   * Log resolution edge analysis statistics
    */
   logStats(): void {
-    if (this.resolvedTrades.length === 0) return;
-    
-    const trades = this.resolvedTrades;
-    const n = trades.length;
-    
-    // Calculate averages
-    const avgExpectedEdge = trades.reduce((sum, t) => sum + t.expectedEdge, 0) / n;
-    const avgRealizedReturn = trades.reduce((sum, t) => sum + t.realizedReturn, 0) / n;
-    const edgeCaptureRate = avgExpectedEdge > 0 ? avgRealizedReturn / avgExpectedEdge : 0;
-    
-    // By outcome
-    const winningTrades = trades.filter(t => t.won);
-    const losingTrades = trades.filter(t => !t.won);
-    const winRate = winningTrades.length / n;
-    
-    const winningAvgExpectedEdge = winningTrades.length > 0
-      ? winningTrades.reduce((sum, t) => sum + t.expectedEdge, 0) / winningTrades.length
-      : 0;
-    const winningAvgRealizedReturn = winningTrades.length > 0
-      ? winningTrades.reduce((sum, t) => sum + t.realizedReturn, 0) / winningTrades.length
-      : 0;
-    
-    const losingAvgExpectedEdge = losingTrades.length > 0
-      ? losingTrades.reduce((sum, t) => sum + t.expectedEdge, 0) / losingTrades.length
-      : 0;
-    const losingAvgRealizedReturn = losingTrades.length > 0
-      ? losingTrades.reduce((sum, t) => sum + t.realizedReturn, 0) / losingTrades.length
-      : 0;
-    
-    // Log like backtest format
-    console.log(`\n📊 ════════════════════════════════════════════════════════════════`);
-    console.log(`   POST-RESOLUTION EDGE ANALYSIS (${n} trades, ${this.resolvedMarkets} markets)`);
-    console.log(`   ──────────────────────────────────────────────────────────────────`);
-    console.log(`   Win Rate:             ${(winRate * 100).toFixed(1)}% (${winningTrades.length}W / ${losingTrades.length}L)`);
-    console.log(`   ──────────────────────────────────────────────────────────────────`);
-    console.log(`   💰 Per-Trade Returns (per share)`);
-    console.log(`      Expected Return:   ${(avgExpectedEdge * 100).toFixed(1)}¢`);
-    console.log(`      Realized Return:   ${(avgRealizedReturn * 100).toFixed(1)}¢`);
-    console.log(`      Edge Capture:      ${(edgeCaptureRate * 100).toFixed(0)}%`);
-    console.log(`   ──────────────────────────────────────────────────────────────────`);
-    console.log(`   ✅ WINNING TRADES (${winningTrades.length})`);
-    console.log(`      Avg Expected Edge: ${(winningAvgExpectedEdge * 100).toFixed(1)}¢/share`);
-    console.log(`      Avg Realized:      ${(winningAvgRealizedReturn * 100).toFixed(1)}¢/share`);
-    console.log(`   ❌ LOSING TRADES (${losingTrades.length})`);
-    console.log(`      Avg Expected Edge: ${(losingAvgExpectedEdge * 100).toFixed(1)}¢/share`);
-    console.log(`      Avg Realized:      ${(losingAvgRealizedReturn * 100).toFixed(1)}¢/share`);
-    console.log(`════════════════════════════════════════════════════════════════════\n`);
+    const stats = this.getStats();
+    if (!stats) return;
+
+    this.log.info('edge_analysis.stats', {
+      trades: stats.totalTrades,
+      markets: stats.totalMarkets,
+      winRate: +((stats.winningTrades / stats.totalTrades) * 100).toFixed(1),
+      wins: stats.winningTrades,
+      losses: stats.losingTrades,
+      avgExpectedEdgeCents: +(stats.avgExpectedEdge * 100).toFixed(1),
+      avgRealizedReturnCents: +(stats.avgRealizedReturn * 100).toFixed(1),
+      edgeCaptureRate: +(stats.edgeCaptureRate * 100).toFixed(0),
+    });
   }
 
   /**
