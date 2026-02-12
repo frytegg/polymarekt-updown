@@ -291,8 +291,17 @@ Options:
                      Prevents unrealistic trade density (1 trade/tick at 60s intervals)
   --max-trades <n>   Maximum total trades per market across both sides (default: 3)
                      Mirrors real liquidity constraints
-  --max-order-usd <$>  Maximum USD per order (default: unlimited)
-  --max-position-usd <$> Maximum USD per market position (default: unlimited)
+
+  Capital & Risk Management:
+  --initial-capital <$>  Starting capital in USD (default: .env ARB_MAX_TOTAL_USD or unlimited)
+                         Enables: ROI %, drawdown %, capital utilization metrics
+                         Set to simulate realistic returns on your actual bankroll
+  --max-order-usd <$>    Max USD per order (default: .env ARB_MAX_ORDER_USD or unlimited)
+  --max-position-usd <$> Max USD per market (default: .env ARB_MAX_POSITION_USD or unlimited)
+
+  Note: Risk parameters default to your .env config if present.
+        CLI flags always override .env values.
+        --edge also reads from .env ARB_EDGE_MIN (converted from decimal to %).
 
   --export           Export results to CSV/JSON files
   --verbose          Show detailed trade and resolution logs
@@ -311,14 +320,17 @@ Examples:
   # Explicit date range (use cached data)
   npx ts-node backtest/index.ts --from 2025-01-15 --to 2025-01-22 --spread 6 --edge 5
 
-  # From date + relative duration
-  npx ts-node backtest/index.ts --from 2025-01-15 --days 7 --edge 10 --export
+  # Backtest with your live risk params (reads from .env)
+  npx ts-node backtest/index.ts --from 2026-01-06 --to 2026-01-30
+
+  # Override capital for what-if analysis
+  npx ts-node backtest/index.ts --from 2026-01-06 --to 2026-01-30 --initial-capital 500
 
   # Show what's cached locally
   npx ts-node backtest/index.ts --cache-info
 
-  # Sweep optimization
-  npx ts-node backtest/index.ts --days 7 --sweep --sweep-min 0 --sweep-max 30 --sweep-step 2
+  # Sweep with realistic capital
+  npx ts-node backtest/index.ts --from 2026-01-06 --to 2026-01-30 --initial-capital 100 --sweep
 
   # Conservative mode with adjustment
   npx ts-node backtest/index.ts --days 14 --adjustment -104 --conservative
