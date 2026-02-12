@@ -26,7 +26,29 @@
       "Bash(ls:*)",
       "Bash(node -e:*)",
       "Bash(tee:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm show:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: production-ready codebase with backtest audit, repo cleanup, and README\n\nBacktest realism fixes \\(14 issues from code audit\\):\n- Add 60s cooldown per market+side, max 3 trades per market\n- Add USD-based position limits \\(maxOrderUsd, maxPositionUsd\\)\n- Model 6-cent spread \\(3c per side\\) matching real Polymarket books\n- Fix Sharpe/Sortino to use absolute daily P&L \\(not per-trade\\)\n- Update P&L curve on resolution only \\(not trade entry\\)\n- Pre-compute running EMA for backtest divergence calculator\n- Add re-entrancy guard to position manager\n- Add 10s orderbook staleness guard in arb-trader\n- Persist orderbook state across WebSocket messages\n- Add reliable paper trading resolution via periodic polling\n\nRepo cleanup:\n- Delete obsolete French design doc\n- Delete 46 generated backtest output files\n- Add mm_example/, data/output/, data/paper-trades/ to .gitignore\n- Exclude mm_example from tsconfig\n- Track 4 essential source files \\(trading-service, paper-trading-tracker,\n  divergence-tracker, divergence-calculator\\)\n- Rewrite README as production-ready English documentation\n- Add comprehensive .env.example with all parameters documented\n- Add Telegram bot integration for trade alerts\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "WebFetch(domain:docs.polymarket.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: initial repo setup with structured src/ layout\n\nSplit from crypto-pricer taker repo. Shared infrastructure moved to\nsrc/ with subdirectories: core/, services/, pricing/, tracking/.\nTaker-only files \\(arb-trader, execution-metrics, resolution-tracker\\)\nnot copied. mm_example included as gitignored reference.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: add Claude Code rules for market-making\n\n- CLAUDE.md: project overview, commands, non-negotiables\n- .claude/rules/coding-style.md: immutability, file org, naming\n- .claude/rules/financial-code.md: tick rounding, precision, validation\n- .claude/rules/market-making.md: unified book, phases, GTD, inventory\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: extend trading-service with GTD, GTC, cancel, and query methods\n\nAdds placeOrderGTD, placeOrderGTC, cancelAll, cancelOrder, cancelOrders,\ngetOpenOrders, and isPaperTrading methods for market-making support.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add MM config and type definitions\n\nMarketMakerConfig with spread, inventory, phase, and safety params.\nNew types: MarketMakerPhase, UnifiedTopOfBook, InventoryState, ActiveOrder, QuoteSet.\nMM_* env vars documented in .env.example.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add order-manager with tracking, locking, and sell guard\n\nTracks active orders per tokenId, placement locks to prevent race\nconditions, failure cooldown, pending sell share accounting \\(over-sell\nguard\\), and exchange resync reconciliation.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "WebFetch(domain:polygonscan.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:legacy-docs.polymarket.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:gitlab.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

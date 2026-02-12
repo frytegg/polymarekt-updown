@@ -576,13 +576,23 @@ class PaperTradingTracker {
     const now = Date.now();
     const positions = Array.from(this.positions.values());
 
+    if (positions.length > 0) {
+      const expired = positions.filter(p => p.marketEndTime > 0 && p.marketEndTime + 120_000 <= now);
+      if (expired.length > 0) {
+        console.log(`[TRACKER] Checking ${expired.length} expired position(s) for resolution...`);
+      }
+    }
+
     for (const pos of positions) {
       // Only check positions past their expiry + 2 min buffer
       if (pos.marketEndTime <= 0 || pos.marketEndTime + 120_000 > now) continue;
 
       try {
+        console.log(`[TRACKER] Fetching outcome for ${pos.side} position in ${pos.marketId.slice(0, 18)}...`);
         const outcome = await this.fetchMarketOutcome(pos.marketId);
         if (outcome) {
+          console.log(`[TRACKER] Market resolved: ${outcome} — triggering redemption`);
+
           // Determine YES/NO token IDs from position
           // We track by tokenId, so we need to resolve by iterating all positions for this market
           const allPositionsForMarket = positions.filter(p => p.marketId === pos.marketId);
@@ -600,7 +610,11 @@ class PaperTradingTracker {
           // Trigger on-chain redemption (live mode) — pass token IDs for balance queries
           if (this.onRedemptionNeeded) {
             this.onRedemptionNeeded(pos.marketId, yesPos?.tokenId, noPos?.tokenId);
+          } else {
+            console.log(`[TRACKER] No redemption callback set — skipping on-chain redeem`);
           }
+        } else {
+          console.log(`[TRACKER] Market ${pos.marketId.slice(0, 18)}... not resolved yet on CLOB API`);
         }
       } catch (err: any) {
         console.log(`[TRACKER] Resolution check failed for ${pos.marketId.slice(0, 18)}...: ${err.message?.slice(0, 60)}`);

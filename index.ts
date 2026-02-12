@@ -66,10 +66,9 @@ class CryptoPricerArb {
     // Track start time for runtime calculation
     this.startTime = Date.now();
 
-    // Clear stale paper trades, positions, and resolutions from previous session
-    // Prevents phantom redemption attempts for already-redeemed markets
-    paperTracker.reset();
-    console.log('[System] Paper trading state cleared for fresh session');
+    // Positions from previous session are kept so checkAndResolveExpired() can
+    // find and redeem them. The revert detection in redemption-service.ts handles
+    // the case where positions were already redeemed manually.
 
     // Initialize Telegram notifications
     initTelegram();
@@ -89,10 +88,16 @@ class CryptoPricerArb {
         rpcUrl
       );
       paperTracker.onRedemptionNeeded = (conditionId: string, yesTokenId?: string, noTokenId?: string) => {
+        console.log(`[Redemption] Triggered for ${conditionId.slice(0, 18)}... YES=${yesTokenId?.slice(0, 10)}... NO=${noTokenId?.slice(0, 10)}...`);
         redemptionService.redeemPositions(conditionId, yesTokenId, noTokenId).catch((err: any) => {
           console.log(`[Redemption] Async error: ${err.message?.slice(0, 80)}`);
         });
       };
+
+      // Immediately check for unredeemed positions from previous session
+      paperTracker.checkAndResolveExpired().catch((err: any) => {
+        console.log(`[Redemption] Startup sweep error: ${err.message?.slice(0, 80)}`);
+      });
     }
 
     // Initialize volatility service (fetches Binance klines + Deribit data, starts refresh loop)
