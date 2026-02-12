@@ -6,7 +6,8 @@
   "scripts": {
     "start": "ts-node index.ts",
     "backtest": "ts-node backtest/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "npx ts-node scripts/smoke-test.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.2.0",
