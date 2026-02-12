@@ -13,6 +13,7 @@
  */
 
 const axios = require('axios');
+import { calculateRealizedVol as coreCalculateRealizedVol } from './core/vol-calculator';
 
 // =============================================================================
 // TYPES
@@ -209,30 +210,14 @@ export class VolatilityService {
   
   /**
    * Calculate annualized realized volatility from klines using log returns
+   * Delegates to core/vol-calculator for the calculation
    */
   private calculateRealizedVol(klines: Kline[]): number {
     if (klines.length < 2) return 0;
-    
-    // Calculate log returns (close to close)
-    const logReturns: number[] = [];
-    for (let i = 1; i < klines.length; i++) {
-      const logReturn = Math.log(klines[i].close / klines[i - 1].close);
-      logReturns.push(logReturn);
-    }
-    
-    if (logReturns.length < 2) return 0;
-    
-    // Standard deviation of log returns
-    const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-    const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1);
-    const stdDev = Math.sqrt(variance);
-    
-    // Annualize: assuming 1-minute intervals
-    // Minutes per year = 365 * 24 * 60 = 525,600
-    const minutesPerYear = 525600;
-    const annualizedVol = stdDev * Math.sqrt(minutesPerYear);
-    
-    return annualizedVol;
+
+    // Extract close prices and delegate to core calculator
+    const closes = klines.map(k => k.close);
+    return coreCalculateRealizedVol(closes, 1); // 1-minute intervals
   }
   
   // ==========================================================================

@@ -27,6 +27,7 @@ import { PositionTracker } from './position-tracker';
 import { BlackScholesStrategy } from '../../strategies';
 import { DivergenceCalculator } from './divergence-calculator';
 import { createLogger } from '../../logger';
+import { calculateRealizedVol as coreCalculateRealizedVol } from '../../core/vol-calculator';
 
 const DEFAULT_CONFIG: BacktestConfig = {
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -632,8 +633,8 @@ export class Simulator {
 
     /**
      * Calculate realized volatility from klines using log returns
-     * Same logic as volatility-service.ts for consistency
-     * 
+     * Delegates to core/vol-calculator for the calculation
+     *
      * @param klines - Array of Binance klines
      * @param endIdx - End index (exclusive) - calculate vol using candles before this
      * @param windowSize - Number of candles to use (e.g., 60 for 1h, 240 for 4h)
@@ -646,26 +647,9 @@ export class Simulator {
 
         if (windowKlines.length < 2) return 0;
 
-        // Calculate log returns (close to close)
-        const logReturns: number[] = [];
-        for (let i = 1; i < windowKlines.length; i++) {
-            const logReturn = Math.log(windowKlines[i].close / windowKlines[i - 1].close);
-            logReturns.push(logReturn);
-        }
-
-        if (logReturns.length < 2) return 0;
-
-        // Standard deviation of log returns
-        const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-        const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1);
-        const stdDev = Math.sqrt(variance);
-
-        // Annualize: assuming 1-minute intervals
-        // Minutes per year = 365 * 24 * 60 = 525,600
-        const minutesPerYear = 525600;
-        const annualizedVol = stdDev * Math.sqrt(minutesPerYear);
-
-        return annualizedVol;
+        // Extract close prices and delegate to core calculator
+        const closes = windowKlines.map(k => k.close);
+        return coreCalculateRealizedVol(closes, 1); // 1-minute intervals
     }
 
     /**
