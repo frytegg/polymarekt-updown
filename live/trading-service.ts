@@ -8,31 +8,16 @@
 import { ClobClient, Side, Chain, OrderType } from '@polymarket/clob-client';
 import { Wallet } from 'ethers';
 import { loadArbConfig } from '../core/config';
+import { ITradingService, OrderConfig, OrderResult } from '../core/trading-interface';
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
-export interface OrderConfig {
-  tokenId: string;
-  price: number;
-  size: number;
-  side: Side;
-  tickSize: string;  // String as returned by Polymarket API
-  negRisk: boolean;
-}
-
-export interface OrderResult {
-  success: boolean;
-  error?: string;
-  orderId?: string;
-}
+// Re-export types for backward compatibility
+export type { OrderConfig, OrderResult };
 
 // =============================================================================
 // TRADING SERVICE
 // =============================================================================
 
-export class TradingService {
+export class TradingService implements ITradingService {
   private client: ClobClient | null = null;
   private initialized = false;
 
