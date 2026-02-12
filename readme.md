@@ -43,22 +43,22 @@ Polymarket settles on Chainlink, but Binance leads price discovery. The bot main
                     Binance WS (BTC price)
                            |
                            v
-index.ts ---- arb-trader.ts ---- fair-value.ts (Black-Scholes)
-   |               |                    |
-   |               |            volatility-service.ts (Deribit DVOL + realized vol)
+index.ts ---- live/arb-trader.ts ---- core/fair-value.ts (Black-Scholes)
+   |               |                           |
+   |               |                   live/volatility-service.ts (Deribit DVOL + realized vol)
    |               |
-   |          position-manager.ts (USD limits, sizing)
+   |          live/position-manager.ts (USD limits, sizing)
    |               |
-   |          trading-service.ts (CLOB API, FAK orders)
+   |          live/trading-service.ts (CLOB API, FAK orders)
    |               |
-   |          paper-trading-tracker.ts (simulated fills + resolution)
+   |          live/trade-persistence.ts (simulated fills + resolution)
    |
-   +--- divergence-tracker.ts (Binance-Chainlink EMA)
-   +--- market-finder.ts (auto-discover next market)
-   +--- orderbook-service.ts (REST polling + WS deltas)
-   +--- strike-service.ts (Chainlink strike fetch)
-   +--- telegram.ts (trade alerts, summaries, bot commands)
-   +--- resolution-tracker.ts (post-expiry P&L)
+   +--- live/divergence-tracker.ts (Binance-Chainlink EMA)
+   +--- live/market-finder.ts (auto-discover next market)
+   +--- live/orderbook-service.ts (REST polling + WS deltas)
+   +--- live/strike-service.ts (Chainlink strike fetch)
+   +--- live/telegram.ts (trade alerts, summaries, bot commands)
+   +--- live/resolution-tracker.ts (post-expiry P&L)
 ```
 
 ### Backtest Engine
@@ -89,13 +89,13 @@ backtest/
 | File | Purpose |
 |------|---------|
 | `index.ts` | Entry point, WebSocket orchestration, market rotation |
-| `arb-trader.ts` | Edge detection, order execution, signal generation |
-| `strategies/black-scholes.ts` | Core pricing model |
-| `volatility-service.ts` | Blended vol: 70% realized 1h + 20% realized 4h + 10% DVOL |
-| `divergence-tracker.ts` | Live Binance-Chainlink EMA with disk persistence |
-| `config.ts` | All tunable parameters with env var overrides |
-| `position-manager.ts` | USD-based position limits and order sizing |
-| `trading-service.ts` | Polymarket CLOB API wrapper (FAK orders) |
+| `live/arb-trader.ts` | Edge detection, order execution, signal generation |
+| `core/strategies/black-scholes.ts` | Core pricing model |
+| `live/volatility-service.ts` | Blended vol: 70% realized 1h + 20% realized 4h + 10% DVOL |
+| `live/divergence-tracker.ts` | Live Binance-Chainlink EMA with disk persistence |
+| `core/config.ts` | All tunable parameters with env var overrides |
+| `live/position-manager.ts` | USD-based position limits and order sizing |
+| `live/trading-service.ts` | Polymarket CLOB API wrapper (FAK orders) |
 
 ## Quick Start
 
@@ -213,32 +213,37 @@ The bot sends alerts for: trades, market resolutions, periodic summaries, and er
 
 ```
 crypto-pricer/
-├── index.ts                  # Entry point and WebSocket orchestration
-├── arb-trader.ts             # Trading logic and edge detection
-├── config.ts                 # Configuration with env var overrides
-├── types.ts                  # Core type definitions
-├── fair-value.ts             # Black-Scholes pricing (shim)
-├── strategies/
-│   ├── black-scholes.ts      # Core BS model
-│   ├── types.ts              # Strategy types
-│   └── index.ts              # Strategy exports
-├── binance-ws.ts             # Binance WebSocket price feed
-├── volatility-service.ts     # Blended volatility calculator
-├── strike-service.ts         # Chainlink strike price fetcher
-├── divergence-tracker.ts     # Live oracle divergence EMA
-├── market-finder.ts          # Auto-discover Polymarket markets
-├── orderbook-service.ts      # CLOB orderbook fetcher
-├── position-manager.ts       # USD-based position limits
-├── trading-service.ts        # Polymarket CLOB API (FAK orders)
-├── paper-trading-tracker.ts  # Paper trading simulator
-├── logger.ts                 # Structured logging (levels, redaction, rate limiting)
-├── resolution-tracker.ts     # Post-expiry resolution tracking
-├── execution-metrics.ts      # Latency and slippage metrics
-├── telegram.ts               # Telegram alerts and bot commands
-├── backtest/
+├── index.ts                  # Main entry point
+├── core/                     # Shared core modules (mode-agnostic)
+│   ├── config.ts             # Configuration with env var overrides
+│   ├── logger.ts             # Structured logging (levels, redaction, rate limiting)
+│   ├── types.ts              # Core type definitions
+│   ├── fair-value.ts         # Black-Scholes pricing (shim)
+│   ├── fees.ts               # Polymarket fee calculation
+│   ├── vol-calculator.ts     # Volatility math (log returns, annualization)
+│   └── strategies/
+│       ├── black-scholes.ts  # Core BS model
+│       ├── types.ts          # Strategy types
+│       └── index.ts          # Strategy exports
+├── live/                     # Live trading infrastructure
+│   ├── arb-trader.ts         # Trading logic and edge detection
+│   ├── binance-ws.ts         # Binance WebSocket price feed
+│   ├── volatility-service.ts # Blended volatility calculator
+│   ├── strike-service.ts     # Chainlink strike price fetcher
+│   ├── divergence-tracker.ts # Live oracle divergence EMA
+│   ├── market-finder.ts      # Auto-discover Polymarket markets
+│   ├── orderbook-service.ts  # CLOB orderbook fetcher
+│   ├── position-manager.ts   # USD-based position limits
+│   ├── trading-service.ts    # Polymarket CLOB API (FAK orders)
+│   ├── trade-persistence.ts  # Trade recording and resolution
+│   ├── resolution-tracker.ts # Post-expiry resolution tracking
+│   ├── execution-metrics.ts  # Latency and slippage metrics
+│   ├── telegram.ts           # Telegram alerts and bot commands
+│   └── redemption-service.ts # USDC redemption after settlement
+├── backtest/                 # Backtest engine (separate mode)
 │   ├── index.ts              # Backtest CLI entry point
 │   ├── types.ts              # Backtest config and result types
-│   ├── engine/               # Simulation engine
+│   ├── engine/               # Simulation engine (simulator, order-matcher, position-tracker)
 │   ├── fetchers/             # Historical data fetchers (Binance, Chainlink, Polymarket, Deribit)
 │   └── output/               # Statistics, P&L curve, trade log export
 ├── data/                     # Cached historical data (gitignored)
@@ -249,7 +254,7 @@ crypto-pricer/
 
 ## Logging
 
-All runtime logging uses a central `logger.ts` module with structured output, level gates, and automatic redaction of sensitive keys. See [docs/logging.md](docs/logging.md) for the full contract.
+All runtime logging uses a central `core/logger.ts` module with structured output, level gates, and automatic redaction of sensitive keys. See [docs/logging.md](docs/logging.md) for the full contract.
 
 | Mode | Level | Format | Use case |
 |------|-------|--------|----------|

@@ -37,22 +37,31 @@ Automated trading bot for Polymarket 15-minute BTC Up/Down markets using Black-S
 
 crypto-pricer/
 ├── index.ts              # Main entry
-├── arb-trader.ts         # Trading logic
-├── fair-value.ts         # Black-Scholes pricing
-├── binance-ws.ts         # Price feed (WebSocket)
-├── volatility-service.ts # Vol calculation
-├── strike-service.ts     # Strike price fetching
-├── backtest/
+├── core/                 # Shared core (mode-agnostic)
+│   ├── config.ts         # Configuration
+│   ├── logger.ts         # Logging infrastructure
+│   ├── types.ts          # Core types
+│   ├── fair-value.ts     # Black-Scholes pricing
+│   ├── fees.ts           # Fee calculation
+│   ├── vol-calculator.ts # Volatility math
+│   └── strategies/       # Trading strategies
+├── live/                 # Live trading infrastructure
+│   ├── arb-trader.ts     # Trading logic
+│   ├── binance-ws.ts     # Price feed (WebSocket)
+│   ├── volatility-service.ts # Vol calculation
+│   ├── strike-service.ts # Strike price fetching
+│   └── [13 other live modules]
+├── backtest/             # Backtest engine (separate mode)
 │   ├── engine/           # Simulation
 │   │   └── simulator.ts  # Main backtest engine
 │   └── fetchers/         # Historical data
 │       ├── binance-historical.ts
-│       ├── chainlink-historical.ts  # NEW
+│       ├── chainlink-historical.ts
 │       ├── polymarket-prices.ts
 │       └── deribit-vol.ts
 └── data/                 # Cached historical data
     ├── binance/
-    ├── chainlink/        # NEW
+    ├── chainlink/
     ├── polymarket/
     └── deribit/
 
