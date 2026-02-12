@@ -19,7 +19,7 @@ import { OrderbookService, getDefaultOrderBookState } from './orderbook-service'
 import { ResolutionTracker } from './resolution-tracker';
 import { TradingService } from './trading-service';
 import { divergenceTracker } from './divergence-tracker';
-import { paperTracker } from './paper-trading-tracker';
+import { paperTracker } from './trade-persistence';
 import { initTelegram, notifyStartup, notifyShutdown, isTelegramEnabled, stopTelegram } from './telegram';
 import { RedemptionService } from './redemption-service';
 

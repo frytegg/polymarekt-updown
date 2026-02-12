@@ -3,7 +3,7 @@
  *
  * Tracks market resolutions and calculates post-resolution edge statistics.
  * Outcome is determined via Polymarket CLOB API (on-chain settlement source).
- * Telegram notifications are handled by paper-trading-tracker callbacks.
+ * Telegram notifications are handled by trade-persistence callbacks.
  */
 
 import { createLogger, Logger } from './logger';
@@ -128,7 +128,7 @@ export class ResolutionTracker {
 
   /**
    * Check pending resolutions via CLOB API (on-chain settlement)
-   * Telegram notifications are handled by paper-trading-tracker callbacks.
+   * Telegram notifications are handled by trade-persistence callbacks.
    */
   async checkResolutions(): Promise<void> {
     // Prevent concurrent checks

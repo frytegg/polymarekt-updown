@@ -48,7 +48,14 @@
       "WebFetch(domain:legacy-docs.polymarket.com)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:gitlab.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:gamma-api.polymarket.com)",
+      "WebFetch(domain:clob.polymarket.com)",
+      "WebFetch(domain:polymarket.com)",
+      "WebFetch(domain:phemex.com)",
+      "WebFetch(domain:www.ainvest.com)",
+      "WebFetch(domain:quantjourney.substack.com)",
+      "WebFetch(domain:www.financemagnates.com)"
     ]
   }
 }

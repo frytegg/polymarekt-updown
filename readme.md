@@ -132,6 +132,7 @@ Edit `.env` with your settings. Key variables:
 | `PRIVATE_KEY` | Wallet private key (not needed for paper) | - |
 | `ARCHIVE_RPC_URL` | Polygon archive RPC (required for backtest) | - |
 | `TELEGRAM_BOT_TOKEN` | Telegram alerts (optional) | - |
+| `LOG_MODE` | Logging preset: `dev`, `live-test`, `prod` | `dev` |
 
 See [.env.example](.env.example) for the complete list with documentation.
 
@@ -230,6 +231,7 @@ crypto-pricer/
 ├── position-manager.ts       # USD-based position limits
 ├── trading-service.ts        # Polymarket CLOB API (FAK orders)
 ├── paper-trading-tracker.ts  # Paper trading simulator
+├── logger.ts                 # Structured logging (levels, redaction, rate limiting)
 ├── resolution-tracker.ts     # Post-expiry resolution tracking
 ├── execution-metrics.ts      # Latency and slippage metrics
 ├── telegram.ts               # Telegram alerts and bot commands
@@ -243,6 +245,24 @@ crypto-pricer/
 ├── .env.example              # Environment variable template
 ├── tsconfig.json             # TypeScript configuration
 └── package.json              # Dependencies and scripts
+```
+
+## Logging
+
+All runtime logging uses a central `logger.ts` module with structured output, level gates, and automatic redaction of sensitive keys. See [docs/logging.md](docs/logging.md) for the full contract.
+
+| Mode | Level | Format | Use case |
+|------|-------|--------|----------|
+| `dev` | debug | pretty | Local development, verbose status ticks |
+| `live-test` | info | pretty | Paper trading, clean output (<200 lines/hr) |
+| `prod` | info | json | Production, structured JSON for log aggregation |
+
+```bash
+# Clean paper trading output
+LOG_MODE=live-test npx ts-node index.ts
+
+# Override level independently
+LOG_MODE=live-test LOG_LEVEL=debug npx ts-node index.ts
 ```
 
 ## Tech Stack

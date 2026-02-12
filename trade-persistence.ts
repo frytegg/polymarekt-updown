@@ -1,6 +1,9 @@
 /**
- * Paper Trading Tracker v2
- * Clean metrics, trade IDs, no misleading unrealized P&L
+ * Trade Persistence Service (Live Trading)
+ *
+ * Records trades, tracks resolutions, and sends Telegram notifications.
+ * Used by live trading mode (both real and paper execution).
+ * NOT related to backtest — see backtest/engine/position-tracker.ts for backtest position tracking.
  */
 
 import * as fs from 'fs';
@@ -115,10 +118,10 @@ export function calculatePolymarketFee(shares: number, price: number): number {
 }
 
 // =============================================================================
-// PAPER TRADING TRACKER
+// TRADE PERSISTENCE SERVICE
 // =============================================================================
 
-class PaperTradingTracker {
+class TradePersistence {
   private trades: PaperTrade[] = [];
   private positions: Map<string, PaperPosition> = new Map();
   private resolutions: ResolutionRecord[] = [];
@@ -687,4 +690,4 @@ class PaperTradingTracker {
 }
 
 // Export singleton
-export const paperTracker = new PaperTradingTracker();
+export const paperTracker = new TradePersistence();

@@ -13,7 +13,7 @@ import { ExecutionMetricsTracker, ExecutionStats, TradeMetric } from './executio
 import { PositionManager } from './position-manager';
 import { StrikePriceService } from './strike-service';
 import { divergenceTracker } from './divergence-tracker';
-import { paperTracker, calculatePolymarketFee } from './paper-trading-tracker';
+import { paperTracker, calculatePolymarketFee } from './trade-persistence';
 import { createLogger, rateLimitedLog, Logger } from './logger';
 
 export class ArbTrader {
