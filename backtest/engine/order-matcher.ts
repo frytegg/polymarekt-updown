@@ -4,6 +4,7 @@
  */
 
 import { Trade, TradeSignal } from '../types';
+import { calculatePolymarketFee } from '../../core/fees';
 
 /**
  * Order matcher configuration
@@ -24,25 +25,9 @@ const DEFAULT_CONFIG: OrderMatcherConfig = {
   includeFees: false,
 };
 
-/**
- * Calculate Polymarket taker fee for 15-min crypto markets
- *
- * Formula from Polymarket docs:
- * fee = shares × price × 0.25 × (price × (1 - price))²
- *
- * Examples:
- * 100 shares @ $0.50 → fee = 100 * 0.50 * 0.25 * (0.50 * 0.50)² = $0.78 (1.56%)
- * 100 shares @ $0.30 → fee = 100 * 0.30 * 0.25 * (0.30 * 0.70)² = $0.33 (1.10%)
- * 100 shares @ $0.80 → fee = 100 * 0.80 * 0.25 * (0.80 * 0.20)² = $0.51 (0.64%)
- *
- * @param shares - Number of shares traded
- * @param price - Execution price (0-1)
- * @returns Fee in dollars
- */
-export function calculatePolymarketFee(shares: number, price: number): number {
-  const feeMultiplier = 0.25 * Math.pow(price * (1 - price), 2);
-  return shares * price * feeMultiplier;
-}
+// Fee calculation is now imported from core/fees.ts
+// See core/fees.ts for implementation and documentation
+export { calculatePolymarketFee } from '../../core/fees';
 
 /**
  * Order Matcher - simulates trade execution with spread

@@ -9,6 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger, Logger, safeErrorData } from './logger';
+import { calculatePolymarketFee } from './core/fees';
 
 // =============================================================================
 // TYPES
@@ -105,17 +106,11 @@ export interface PaperStats {
 }
 
 // =============================================================================
-// FEE CALCULATION
+// FEE CALCULATION (re-exported from core for backward compatibility)
 // =============================================================================
 
-/**
- * Calculate Polymarket taker fee for 15-min crypto markets
- * Fee formula: shares * price * 0.25 * (price * (1 - price))^2
- */
-export function calculatePolymarketFee(shares: number, price: number): number {
-  const feeMultiplier = 0.25 * Math.pow(price * (1 - price), 2);
-  return shares * price * feeMultiplier;
-}
+// Re-export fee calculator from core
+export { calculatePolymarketFee } from './core/fees';
 
 // =============================================================================
 // TRADE PERSISTENCE SERVICE
