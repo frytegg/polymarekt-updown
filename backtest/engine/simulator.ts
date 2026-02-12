@@ -90,11 +90,21 @@ export class Simulator {
     private lastTradeTimestamp: Map<string, number> = new Map(); // key: marketId:side
     private marketTradeCount: Map<string, number> = new Map();   // key: marketId
 
+    // Capital tracking (for finite capital mode)
+    private availableCapital: number = Infinity;  // Remaining capital to deploy
+    private deployedCapital: number = 0;          // Capital currently in open positions
+    private peakDeployedCapital: number = 0;      // Maximum capital deployed at any point
+
     // Logging
     private log = createLogger('Backtest:Simulator', { mode: 'backtest' });
 
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+
+        // Initialize capital tracking
+        this.availableCapital = this.config.initialCapital;
+        this.deployedCapital = 0;
+        this.peakDeployedCapital = 0;
 
         // Apply mode settings
         this.applyModeSettings();
@@ -165,6 +175,11 @@ export class Simulator {
         this.orderMatcher.reset();
         this.lastTradeTimestamp.clear();
         this.marketTradeCount.clear();
+
+        // Reset capital tracking
+        this.availableCapital = this.config.initialCapital;
+        this.deployedCapital = 0;
+        this.peakDeployedCapital = 0;
 
         // Step 1: Fetch all historical markets
         console.log('📡 Step 1: Fetching historical markets...');
@@ -287,6 +302,9 @@ export class Simulator {
 
         const outcome = determineOutcome(finalBtcPrice, market.strikePrice);
 
+        // Get position before resolution to track capital return
+        const positionBeforeResolve = this.positionTracker.getPosition(market.conditionId);
+
         this.positionTracker.resolve(
             market.conditionId,
             outcome,
@@ -294,6 +312,20 @@ export class Simulator {
             market.strikePrice,
             market.endTime
         );
+
+        // Return capital to available pool (if initialCapital is finite)
+        if (this.config.initialCapital !== Infinity && positionBeforeResolve) {
+            const totalCost = positionBeforeResolve.yesCost + positionBeforeResolve.noCost;
+
+            // Calculate payout based on outcome
+            const yesPayout = outcome === 'UP' ? positionBeforeResolve.yesShares : 0;
+            const noPayout = outcome === 'DOWN' ? positionBeforeResolve.noShares : 0;
+            const totalPayout = yesPayout + noPayout;
+
+            // Return capital: deployed capital is freed, and we add/subtract P&L
+            this.deployedCapital -= totalCost;
+            this.availableCapital += totalPayout;
+        }
     }
 
     /**
@@ -572,6 +604,24 @@ export class Simulator {
         }
         if (effectiveSize <= 0) return;
 
+        // Capital constraint: Check if we have enough capital (if initialCapital is finite)
+        if (this.config.initialCapital !== Infinity) {
+            const orderCostUsd = effectiveSize * buyPrice;
+
+            if (orderCostUsd > this.availableCapital) {
+                // Option: Reduce order size to fit available capital
+                const affordableSize = Math.floor(this.availableCapital / buyPrice);
+
+                if (affordableSize <= 0) {
+                    // Can't afford any shares - skip trade
+                    return;
+                }
+
+                // Use reduced size
+                effectiveSize = affordableSize;
+            }
+        }
+
         // Create signal
         const signal: TradeSignal = {
             timestamp: executionTs,
@@ -593,6 +643,14 @@ export class Simulator {
 
         // Record trade
         this.positionTracker.recordTrade(trade);
+
+        // Update capital tracking (if initialCapital is finite)
+        if (this.config.initialCapital !== Infinity) {
+            const orderCost = trade.totalCost;  // Includes fee
+            this.availableCapital -= orderCost;
+            this.deployedCapital += orderCost;
+            this.peakDeployedCapital = Math.max(this.peakDeployedCapital, this.deployedCapital);
+        }
 
         // Update cooldown and trade count tracking
         this.lastTradeTimestamp.set(cooldownKey, tick.timestamp);
@@ -760,6 +818,12 @@ export class Simulator {
         // Max drawdown
         const maxDrawdown = this.calculateMaxDrawdown(pnlCurve);
 
+        // Capital metrics
+        const initialCapital = this.config.initialCapital;
+        const finalCapital = initialCapital !== Infinity ? initialCapital + totalPnL : Infinity;
+        const peakDeployedCapital = this.peakDeployedCapital;
+        const capitalUtilization = initialCapital !== Infinity ? peakDeployedCapital / initialCapital : 0;
+
         return {
             config: this.config,
             totalMarkets: resolutions.length,
@@ -775,6 +839,10 @@ export class Simulator {
             realizedEdge,
             sharpeRatio,
             maxDrawdown,
+            initialCapital,
+            finalCapital,
+            peakDeployedCapital,
+            capitalUtilization,
             trades,
             resolutions,
             pnlCurve,
@@ -800,6 +868,10 @@ export class Simulator {
             realizedEdge: 0,
             sharpeRatio: 0,
             maxDrawdown: 0,
+            initialCapital: this.config.initialCapital,
+            finalCapital: this.config.initialCapital,
+            peakDeployedCapital: 0,
+            capitalUtilization: 0,
             trades: [],
             resolutions: [],
             pnlCurve: [],

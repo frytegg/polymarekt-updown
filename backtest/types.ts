@@ -214,6 +214,12 @@ export interface BacktestResult {
     sharpeRatio: number;
     maxDrawdown: number;
 
+    // Capital metrics (only meaningful when initialCapital !== Infinity)
+    initialCapital: number;        // Starting capital
+    finalCapital: number;          // initialCapital + totalPnL
+    peakDeployedCapital: number;   // Maximum capital deployed at any point
+    capitalUtilization: number;    // peakDeployed / initial (as ratio, e.g., 0.385 = 38.5%)
+
     // Detailed data
     trades: Trade[];
     resolutions: MarketResolution[];
