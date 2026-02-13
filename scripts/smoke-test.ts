@@ -18,6 +18,7 @@
  *   8. Backtest reads .env risk params as defaults
  *   9. fetch-range --dry-run shows plan without fetching
  *  10. fetch-range --report-only generates coverage report
+ *  11. Coverage report has no invalid gaps or bogus dates
  */
 
 import { spawn, ChildProcess } from 'child_process';
@@ -795,6 +796,100 @@ async function test10_FetchRangeReportOnly(): Promise<TestResult> {
   };
 }
 
+/**
+ * Test 11: Coverage report has no invalid gaps or bogus dates
+ */
+async function test11_CoverageReportIntegrity(): Promise<TestResult> {
+  const startTime = Date.now();
+
+  // Generate a fresh report
+  const result = await spawnProcess({
+    command: 'npx',
+    args: [
+      'ts-node',
+      'scripts/fetch-range.ts',
+      '--from', '2026-01-06',
+      '--to', '2026-01-30',
+      '--report-only',
+    ],
+    timeout: 15000,
+  });
+
+  const duration = (Date.now() - startTime) / 1000;
+
+  if (result.exitCode !== 0) {
+    return {
+      name: 'Coverage report integrity',
+      status: 'fail',
+      duration,
+      message: `Exit code ${result.exitCode}`,
+      debugInfo: { stderr: result.stderr.slice(-500) },
+    };
+  }
+
+  // Read and parse JSON report
+  const reportPath = path.join(__dirname, '..', 'data', 'coverage-report.json');
+  if (!fs.existsSync(reportPath)) {
+    return {
+      name: 'Coverage report integrity',
+      status: 'fail',
+      duration,
+      message: 'coverage-report.json not found',
+    };
+  }
+
+  let report: any;
+  try {
+    report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+  } catch {
+    return {
+      name: 'Coverage report integrity',
+      status: 'fail',
+      duration,
+      message: 'coverage-report.json is not valid JSON',
+    };
+  }
+
+  // Validate: no gap has start > end or negative durationHours
+  const BOGUS_DATE_CUTOFF = '2027-01-01T00:00:00.000Z';
+  for (const source of report.sources || []) {
+    for (const gap of source.gaps || []) {
+      if (new Date(gap.start).getTime() >= new Date(gap.end).getTime()) {
+        return {
+          name: 'Coverage report integrity',
+          status: 'fail',
+          duration,
+          message: `${source.source}: gap start >= end (${gap.start} -> ${gap.end})`,
+        };
+      }
+      if (gap.durationHours < 0) {
+        return {
+          name: 'Coverage report integrity',
+          status: 'fail',
+          duration,
+          message: `${source.source}: gap has negative durationHours (${gap.durationHours})`,
+        };
+      }
+    }
+
+    // Validate: no source date is bogus (year > 2027)
+    if (source.latestDate && new Date(source.latestDate) > new Date(BOGUS_DATE_CUTOFF)) {
+      return {
+        name: 'Coverage report integrity',
+        status: 'fail',
+        duration,
+        message: `${source.source}: latestDate is bogus (${source.latestDate})`,
+      };
+    }
+  }
+
+  return {
+    name: 'Coverage report integrity',
+    status: 'pass',
+    duration,
+  };
+}
+
 // =============================================================================
 // MAIN
 // =============================================================================
@@ -827,6 +922,7 @@ async function main() {
     { name: 'Test 8', fn: () => test8_EnvDefaults(dateRange) },
     { name: 'Test 9', fn: test9_FetchRangeDryRun },
     { name: 'Test 10', fn: test10_FetchRangeReportOnly },
+    { name: 'Test 11', fn: test11_CoverageReportIntegrity },
   ];
 
   for (let i = 0; i < tests.length; i++) {
