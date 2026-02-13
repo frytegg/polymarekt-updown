@@ -62,6 +62,7 @@ function parseArgs(): {
     adjustmentMethod: AdjustmentMethod;
     adjustmentWindow: number;
     fees: boolean;
+    slippageBps: number;
     cooldownMs: number;
     maxTrades: number;
     maxOrderUsd: number;
@@ -89,6 +90,9 @@ function parseArgs(): {
         initialCapital: process.env.ARB_MAX_TOTAL_USD
             ? parseFloat(process.env.ARB_MAX_TOTAL_USD)
             : Infinity,
+        slippageBps: process.env.ARB_SLIPPAGE_BPS
+            ? parseInt(process.env.ARB_SLIPPAGE_BPS, 10)
+            : 200,
     };
 
     const result = {
@@ -115,6 +119,7 @@ function parseArgs(): {
         adjustmentMethod: 'static' as AdjustmentMethod,
         adjustmentWindow: 2,
         fees: false,
+        slippageBps: envDefaults.slippageBps,
         cooldownMs: 60000,
         maxTrades: 3,
         maxOrderUsd: envDefaults.maxOrderUsd,
@@ -204,6 +209,9 @@ function parseArgs(): {
             case '--fees':
                 result.fees = true;
                 break;
+            case '--slippage':
+                result.slippageBps = parseInt(args[++i], 10) || 200;
+                break;
             case '--cooldown-ms':
                 result.cooldownMs = parseInt(args[++i], 10) || 60000;
                 break;
@@ -286,6 +294,10 @@ Options:
   --fees             Include Polymarket taker fees (15-min crypto markets)
                      Fee formula: shares × price × 0.25 × (price × (1 - price))²
                      Typical rates: 1.56% @ 50¢, 1.10% @ 30¢, 0.64% @ 80¢
+  --no-fees          Disable fees (fees are ON by default)
+
+  --slippage <bps>   Execution slippage in basis points (default: 200, from .env ARB_SLIPPAGE_BPS)
+                     Live trading uses 200 bps (2%). Set to 0 for optimistic simulation.
 
   --cooldown-ms <ms> Minimum ms between trades per market+side (default: 60000)
                      Prevents unrealistic trade density (1 trade/tick at 60s intervals)
@@ -627,6 +639,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
     console.log(`   Order Size:  ${args.size} shares`);
     console.log(`   Lag:         ${args.lag}s`);
     console.log(`   Fees:        ${args.fees ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`   Slippage:    ${args.slippageBps} bps`);
 
     // Capital & Risk Management (show if not defaults)
     const showCapitalSection = args.maxOrderUsd !== Infinity || args.maxPositionUsd !== Infinity || args.initialCapital !== Infinity;
@@ -672,6 +685,7 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             adjustmentMethod: args.adjustmentMethod,
             adjustmentWindowHours: args.adjustmentWindow,
             includeFees: args.fees,
+            slippageBps: args.slippageBps,
             cooldownMs: args.cooldownMs,
             maxTradesPerMarket: args.maxTrades,
             maxOrderUsd: args.maxOrderUsd,
@@ -812,6 +826,7 @@ async function main(): Promise<void> {
         adjustmentMethod: args.adjustmentMethod,
         adjustmentWindowHours: args.adjustmentWindow,
         includeFees: args.fees,
+        slippageBps: args.slippageBps,
         cooldownMs: args.cooldownMs,
         maxTradesPerMarket: args.maxTrades,
         maxOrderUsd: args.maxOrderUsd,
@@ -844,6 +859,7 @@ async function main(): Promise<void> {
         }
     }
     console.log(`   Fees:        ${args.fees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
+    console.log(`   Slippage:    ${args.slippageBps} bps${args.slippageBps === 0 ? ' ⚠️  Live uses 200 bps' : ''}`);
 
     // Capital & Risk Management (show only if not using default values)
     const showCapitalSection = args.maxOrderUsd !== Infinity || args.maxPositionUsd !== Infinity || args.initialCapital !== Infinity;

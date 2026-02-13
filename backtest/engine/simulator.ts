@@ -46,6 +46,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
     adjustmentMethod: 'static', // Static adjustment by default
     adjustmentWindowHours: 2,   // 2-hour rolling window for adaptive methods
     includeFees: false,       // No fees by default
+    slippageBps: 200,         // 200 bps (2%) matching live ARB_SLIPPAGE_BPS default
     cooldownMs: 60000,        // 60s cooldown between trades per market+side (1 per tick)
     maxTradesPerMarket: 3,    // Max 3 trades per market (mirrors real liquidity constraints)
     maxOrderUsd: Infinity,    // No USD limit by default (use share-based limits)
@@ -120,6 +121,7 @@ export class Simulator {
         this.orderMatcher = new OrderMatcher({
             spreadCents: this.config.spreadCents,
             includeFees: this.config.includeFees,
+            slippageBps: this.config.slippageBps,
         });
         this.positionTracker = new PositionTracker();
     }
@@ -161,6 +163,7 @@ export class Simulator {
         }
         console.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)`);
         console.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
+        console.log(`📉 Slippage: ${this.config.slippageBps} bps${this.config.slippageBps === 0 ? ' ⚠️  Live trading uses 200 bps. Results may be overly optimistic.' : ''}`);
         console.log(`🔄 Cooldown: ${this.config.cooldownMs}ms | Max Trades/Market: ${this.config.maxTradesPerMarket}`);
         if (this.config.maxOrderUsd < Infinity || this.config.maxPositionUsd < Infinity) {
             console.log(`💵 USD Limits: Order=$${this.config.maxOrderUsd}, Position=$${this.config.maxPositionUsd}`);
@@ -944,6 +947,7 @@ export class Simulator {
         this.orderMatcher.updateConfig({
             spreadCents: this.config.spreadCents,
             includeFees: this.config.includeFees,
+            slippageBps: this.config.slippageBps,
         });
     }
 }

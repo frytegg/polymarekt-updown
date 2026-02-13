@@ -184,6 +184,7 @@ export interface BacktestConfig {
     adjustmentMethod: AdjustmentMethod;  // Method for calculating adjustment (default: 'static')
     adjustmentWindowHours: number;       // Rolling window size in hours for adaptive methods (default: 2)
     includeFees: boolean;      // Include Polymarket taker fees (15-min crypto markets)
+    slippageBps: number;       // Execution slippage in basis points (default: 200, matching live ARB_SLIPPAGE_BPS)
     cooldownMs: number;        // Minimum ms between trades per market+side (default: 60000)
     maxTradesPerMarket: number; // Max total trades per market across both sides (default: 3)
     maxOrderUsd: number;       // Max USD per order (default: Infinity = share-based only)
