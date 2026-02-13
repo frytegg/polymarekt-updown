@@ -45,7 +45,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
     binanceChainlinkAdjustment: 0, // No adjustment by default (set to -104 for divergence correction)
     adjustmentMethod: 'static', // Static adjustment by default
     adjustmentWindowHours: 2,   // 2-hour rolling window for adaptive methods
-    includeFees: false,       // No fees by default
+    includeFees: true,        // Fees ON by default — matches live trading. Use --no-fees to disable.
     slippageBps: 200,         // 200 bps (2%) matching live ARB_SLIPPAGE_BPS default
     cooldownMs: 60000,        // 60s cooldown between trades per market+side (1 per tick)
     maxTradesPerMarket: 3,    // Max 3 trades per market (mirrors real liquidity constraints)

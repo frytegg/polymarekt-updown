@@ -118,7 +118,7 @@ function parseArgs(): {
         adjustment: 0,
         adjustmentMethod: 'static' as AdjustmentMethod,
         adjustmentWindow: 2,
-        fees: false,
+        fees: true,   // Fees ON by default — matches live trading
         slippageBps: envDefaults.slippageBps,
         cooldownMs: 60000,
         maxTrades: 3,
@@ -207,7 +207,10 @@ function parseArgs(): {
                 result.mode = 'normal';
                 break;
             case '--fees':
-                result.fees = true;
+                result.fees = true;  // Already default, kept for backward compat
+                break;
+            case '--no-fees':
+                result.fees = false;
                 break;
             case '--slippage':
                 result.slippageBps = parseInt(args[++i], 10) || 200;
