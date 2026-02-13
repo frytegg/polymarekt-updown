@@ -743,9 +743,11 @@ export class Simulator {
         klineIdx: number,
         dvolVol: number
     ): number {
-        // Calculate realized vol on 1h and 4h windows
-        const realizedVol1h = this.calculateRealizedVol(klines, klineIdx + 1, VOL_BLEND_CONFIG.window1h);
-        const realizedVol4h = this.calculateRealizedVol(klines, klineIdx + 1, VOL_BLEND_CONFIG.window4h);
+        // Exclude current kline from RV calculation to avoid look-ahead bias.
+        // The current kline's close is not known yet — only completed candles are used.
+        // See OPTIMIZER-READINESS-AUDIT.md §2.2 item 4, §4.4.
+        const realizedVol1h = this.calculateRealizedVol(klines, klineIdx, VOL_BLEND_CONFIG.window1h);
+        const realizedVol4h = this.calculateRealizedVol(klines, klineIdx, VOL_BLEND_CONFIG.window4h);
 
         // If we don't have enough data for realized vol, fall back to DVOL
         if (realizedVol1h === 0 && realizedVol4h === 0) {
