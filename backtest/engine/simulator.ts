@@ -770,11 +770,13 @@ export class Simulator {
 
     /**
      * Get DVOL at timestamp (implied volatility from Deribit)
+     * Binary search returns DVOL at-or-before target timestamp (strictly causal).
+     * Never returns a future DVOL point. Falls back to 50% if no causal data exists.
      */
     private getDvolAt(volPoints: DeribitVolPoint[], timestamp: number): number {
         if (volPoints.length === 0) return 0.50; // Default 50%
 
-        // Binary search
+        // Binary search for first point at-or-after timestamp
         let left = 0;
         let right = volPoints.length - 1;
 
@@ -787,7 +789,18 @@ export class Simulator {
             }
         }
 
-        const idx = Math.max(0, left);
+        let idx = left;
+
+        // Ensure we never use future data: step back if the found point is after target
+        if (volPoints[idx].timestamp > timestamp) {
+            if (idx > 0) {
+                idx--;
+            } else {
+                // First point is still in the future — no causal data available
+                return 0.50; // Safe fallback
+            }
+        }
+
         return volPoints[idx].vol;
     }
 
