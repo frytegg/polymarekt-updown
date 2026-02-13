@@ -59,8 +59,9 @@ export interface DeribitVolPoint {
  */
 export interface AlignedTick {
     timestamp: number;
-    btcPrice: number;           // From Binance (close price)
-    btcKline?: BinanceKline;    // Full kline for worst-case simulation
+    btcPrice: number;           // From Binance (open price of current kline — causal)
+    btcKline?: BinanceKline;    // Current kline (open is known, close/low/high are NOT yet known)
+    prevBtcKline?: BinanceKline; // Previous completed kline (all fields known — used for conservative mode)
     polyMidYes: number;         // Polymarket YES mid price
     polyMidNo: number;          // Polymarket NO mid price (usually 1 - YES)
     vol: number;                // Blended vol: 70% realized 1h + 20% realized 4h + 10% DVOL

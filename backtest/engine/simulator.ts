@@ -373,14 +373,19 @@ export class Simulator {
             const kline = btcKlines[klineIdx];
 
             // Get BTC price - either from Chainlink or Binance based on config
+            // Use kline OPEN price (not close) to avoid look-ahead bias.
+            // The close is not known until the candle ends (up to 60s later).
+            // In live trading, we use real-time tick prices, which are closest to the open
+            // of the current forming candle.
+            // See OPTIMIZER-READINESS-AUDIT.md §1.1 (B.1).
             let btcPrice: number | null = null;
             if (useChainlink) {
                 // Use Chainlink price for fair value calculation
                 const chainlinkPoint = this.getChainlinkPriceAt(chainlinkPrices, btcTimestamp);
                 btcPrice = chainlinkPoint?.price ?? null;
             } else {
-                // Use Binance price (default) with adjustment
-                btcPrice = kline?.close ?? null;
+                // Use Binance kline OPEN price (causal — known at candle start)
+                btcPrice = kline?.open ?? null;
                 if (btcPrice !== null) {
                     // Get adjustment based on method
                     const adjustment = this.getAdjustmentAtTime(btcTimestamp);
@@ -400,10 +405,14 @@ export class Simulator {
             // Time remaining based on when we EXECUTE (T), not when we decide (T-lag)
             const timeRemainingMs = market.endTime - ts;
 
+            // Previous completed kline (all fields known — used for conservative mode)
+            const prevKline = klineIdx > 0 ? btcKlines[klineIdx - 1] : undefined;
+
             ticks.push({
                 timestamp: ts,
                 btcPrice,
                 btcKline: kline,
+                prevBtcKline: prevKline,
                 polyMidYes: polyPrice.price,
                 polyMidNo: 1 - polyPrice.price,
                 vol,
@@ -498,15 +507,20 @@ export class Simulator {
         midPrice: number
     ): void {
         // Get BTC price for fair value calculation
-        // Conservative: worst-case from kline (low for YES, high for NO)
-        // Normal: close price (already adjusted in alignTicks)
+        // Conservative: pessimistic proxy from PREVIOUS completed kline (low for YES, high for NO)
+        //   Using the previous kline avoids look-ahead bias — the current kline's low/high
+        //   are not known until the candle closes. This changes semantics from "intrabar
+        //   worst-case" to "previous-bar pessimistic proxy". See OPTIMIZER-READINESS-AUDIT.md §1.1.
+        // Normal: open price (already adjusted in alignTicks — causal)
         let btcPriceForFV: number;
         if (this.useWorstCasePricing) {
             // Buying YES = betting BTC goes UP → worst case: BTC was at LOW (P(up) is lower)
             // Buying NO = betting BTC goes DOWN → worst case: BTC was at HIGH (P(down) is lower)
-            const rawPrice = side === 'YES'
-                ? (tick.btcKline?.low ?? tick.btcPrice)
-                : (tick.btcKline?.high ?? tick.btcPrice);
+            // Use PREVIOUS completed kline (causal) — fall back to current kline's open if unavailable
+            const worstCaseKline = tick.prevBtcKline;
+            const rawPrice = worstCaseKline
+                ? (side === 'YES' ? worstCaseKline.low : worstCaseKline.high)
+                : (tick.btcKline?.open ?? tick.btcPrice);
             // Apply adjustment if using Binance (adaptive or static)
             if (!this.config.useChainlinkForFairValue) {
                 const adjustment = this.getAdjustmentAtTime(tick.timestamp);
@@ -515,7 +529,7 @@ export class Simulator {
                 btcPriceForFV = rawPrice;
             }
         } else {
-            // Normal mode: use close price (already adjusted in alignTicks)
+            // Normal mode: use open price (already adjusted in alignTicks — causal)
             btcPriceForFV = tick.btcPrice;
         }
 
@@ -560,18 +574,22 @@ export class Simulator {
         // Skip if execution would be too close to market end
         if (executionTs >= market.endTime - 30000) return;
 
-        // Get BTC price at execution time
+        // Get BTC price at execution time (causal — same look-ahead-free logic as decision time)
         let execBtcPrice = btcPriceForFV;
         if (this.effectiveLatencyMs > 0 && this.currentKlines.length > 0) {
             const execKlineIdx = this.getKlineIndex(this.currentKlines, executionTs);
             const execKline = this.currentKlines[execKlineIdx];
             if (execKline) {
-                // Use same pricing logic as decision time
                 let rawExecPrice: number;
                 if (this.useWorstCasePricing) {
-                    rawExecPrice = side === 'YES' ? execKline.low : execKline.high;
+                    // Use PREVIOUS completed kline for conservative mode (causal)
+                    const prevExecKline = execKlineIdx > 0 ? this.currentKlines[execKlineIdx - 1] : null;
+                    rawExecPrice = prevExecKline
+                        ? (side === 'YES' ? prevExecKline.low : prevExecKline.high)
+                        : execKline.open;
                 } else {
-                    rawExecPrice = execKline.close;
+                    // Use kline open (causal — close is not known yet)
+                    rawExecPrice = execKline.open;
                 }
                 // Apply adjustment if using Binance (adaptive or static)
                 if (!this.config.useChainlinkForFairValue) {
