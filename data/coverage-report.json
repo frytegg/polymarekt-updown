@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-02-13T01:07:38.548Z",
+  "requestedRange": {
+    "start": "2026-01-06T00:00:00.000Z",
+    "end": "2026-01-30T23:59:59.999Z"
+  },
+  "sources": [
+    {
+      "source": "binance",
+      "earliestDate": "2025-12-12T00:00:00.000Z",
+      "latestDate": "2026-02-12T23:59:59.999Z",
+      "fileCount": 10,
+      "totalSizeMb": 33.68696403503418,
+      "gaps": [],
+      "warnings": []
+    },
+    {
+      "source": "chainlink",
+      "earliestDate": "2026-01-03T00:00:00.000Z",
+      "latestDate": "2026-02-12T23:59:59.999Z",
+      "fileCount": 9,
+      "totalSizeMb": 40.42523384094238,
+      "gaps": [],
+      "warnings": []
+    },
+    {
+      "source": "deribit",
+      "earliestDate": "2025-12-12T00:00:00.000Z",
+      "latestDate": "2026-02-12T23:59:59.999Z",
+      "fileCount": 10,
+      "totalSizeMb": 0.6732625961303711,
+      "gaps": [],
+      "warnings": []
+    },
+    {
+      "source": "polymarket",
+      "earliestDate": "2025-12-12T00:00:00.000Z",
+      "latestDate": "2026-02-12T23:59:59.999Z",
+      "fileCount": 10,
+      "totalSizeMb": 8.220909118652344,
+      "gaps": [],
+      "warnings": []
+    }
+  ],
+  "intersection": {
+    "start": "2026-01-03T00:00:00.000Z",
+    "end": "2026-02-12T23:59:59.999Z",
+    "days": 40
+  },
+  "polymarket": {
+    "totalMarkets": 2393,
+    "marketsWithPrices": 2348,
+    "marketsMissingPrices": 45,
+    "coveragePct": 98.11951525282073
+  },
+  "recommendations": [
+    "Extend chainlink backward to reach 60-day intersection (currently 40 days)"
+  ]
+}
