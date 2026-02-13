@@ -7,7 +7,9 @@
     "start": "ts-node index.ts",
     "backtest": "ts-node backtest/index.ts",
     "typecheck": "tsc --noEmit",
-    "test:smoke": "npx ts-node scripts/smoke-test.ts"
+    "test:smoke": "npx ts-node scripts/smoke-test.ts",
+    "fetch-data": "npx ts-node scripts/fetch-range.ts",
+    "data-report": "npx ts-node scripts/fetch-range.ts --report-only"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.2.0",
