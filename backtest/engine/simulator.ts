@@ -51,6 +51,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
     maxTradesPerMarket: 3,    // Max 3 trades per market (mirrors real liquidity constraints)
     maxOrderUsd: Infinity,    // No USD limit by default (use share-based limits)
     maxPositionUsd: Infinity, // No USD position limit by default
+    silent: false,            // Print output by default (CLI behavior unchanged)
 };
 
 /**
@@ -96,8 +97,22 @@ export class Simulator {
     private deployedCapital: number = 0;          // Capital currently in open positions
     private peakDeployedCapital: number = 0;      // Maximum capital deployed at any point
 
-    // Logging
-    private log = createLogger('Backtest:Simulator', { mode: 'backtest' });
+    // Logging — structured logger for non-silenceable logs
+    private logger = createLogger('Backtest:Simulator', { mode: 'backtest' });
+
+    /** Console output, suppressed when config.silent is true */
+    private log(message: string): void {
+        if (!this.config.silent) {
+            console.log(message);
+        }
+    }
+
+    /** Console warn output, suppressed when config.silent is true */
+    private warn(message: string): void {
+        if (!this.config.silent) {
+            console.warn(message);
+        }
+    }
 
     constructor(config: Partial<BacktestConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -147,28 +162,28 @@ export class Simulator {
      * Run the backtest
      */
     async run(): Promise<BacktestResult> {
-        console.log('\n🚀 Starting Backtest...\n');
-        console.log(`📅 Period: ${this.config.startDate.toISOString()} to ${this.config.endDate.toISOString()}`);
-        console.log(`💰 Capital: ${this.config.initialCapital === Infinity ? 'Unlimited' : `$${this.config.initialCapital}`}`);
-        console.log(`📊 Spread: ${this.config.spreadCents}¢ | Min Edge: ${(this.config.minEdge * 100).toFixed(1)}%`);
-        console.log(`📦 Order Size: ${this.config.orderSize} shares | Max Position: ${this.config.maxPositionPerMarket}`);
-        console.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)`);
-        console.log(`🔗 Fair Value Oracle: ${this.config.useChainlinkForFairValue ? 'CHAINLINK' : 'BINANCE'}`);
+        this.log('\n🚀 Starting Backtest...\n');
+        this.log(`📅 Period: ${this.config.startDate.toISOString()} to ${this.config.endDate.toISOString()}`);
+        this.log(`💰 Capital: ${this.config.initialCapital === Infinity ? 'Unlimited' : `$${this.config.initialCapital}`}`);
+        this.log(`📊 Spread: ${this.config.spreadCents}¢ | Min Edge: ${(this.config.minEdge * 100).toFixed(1)}%`);
+        this.log(`📦 Order Size: ${this.config.orderSize} shares | Max Position: ${this.config.maxPositionPerMarket}`);
+        this.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)`);
+        this.log(`🔗 Fair Value Oracle: ${this.config.useChainlinkForFairValue ? 'CHAINLINK' : 'BINANCE'}`);
         if (!this.config.useChainlinkForFairValue) {
             if (this.config.adjustmentMethod === 'static') {
-                console.log(`📐 Adjustment Method: STATIC ($${this.config.binanceChainlinkAdjustment})`);
+                this.log(`📐 Adjustment Method: STATIC ($${this.config.binanceChainlinkAdjustment})`);
             } else {
-                console.log(`📐 Adjustment Method: ${this.config.adjustmentMethod.toUpperCase()} (${this.config.adjustmentWindowHours}h window, fallback: $${this.config.binanceChainlinkAdjustment})`);
+                this.log(`📐 Adjustment Method: ${this.config.adjustmentMethod.toUpperCase()} (${this.config.adjustmentWindowHours}h window, fallback: $${this.config.binanceChainlinkAdjustment})`);
             }
         }
-        console.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)`);
-        console.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
-        console.log(`📉 Slippage: ${this.config.slippageBps} bps${this.config.slippageBps === 0 ? ' ⚠️  Live trading uses 200 bps. Results may be overly optimistic.' : ''}`);
-        console.log(`🔄 Cooldown: ${this.config.cooldownMs}ms | Max Trades/Market: ${this.config.maxTradesPerMarket}`);
+        this.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)`);
+        this.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
+        this.log(`📉 Slippage: ${this.config.slippageBps} bps${this.config.slippageBps === 0 ? ' ⚠️  Live trading uses 200 bps. Results may be overly optimistic.' : ''}`);
+        this.log(`🔄 Cooldown: ${this.config.cooldownMs}ms | Max Trades/Market: ${this.config.maxTradesPerMarket}`);
         if (this.config.maxOrderUsd < Infinity || this.config.maxPositionUsd < Infinity) {
-            console.log(`💵 USD Limits: Order=$${this.config.maxOrderUsd}, Position=$${this.config.maxPositionUsd}`);
+            this.log(`💵 USD Limits: Order=$${this.config.maxOrderUsd}, Position=$${this.config.maxPositionUsd}`);
         }
-        console.log('');
+        this.log('');
 
         const startTs = this.config.startDate.getTime();
         const endTs = this.config.endDate.getTime();
@@ -185,46 +200,46 @@ export class Simulator {
         this.peakDeployedCapital = 0;
 
         // Step 1: Fetch all historical markets
-        console.log('📡 Step 1: Fetching historical markets...');
+        this.log('📡 Step 1: Fetching historical markets...');
         const markets = await this.marketsFetcher.fetch(startTs, endTs);
-        console.log(`   Found ${markets.length} markets\n`);
+        this.log(`   Found ${markets.length} markets\n`);
 
         if (markets.length === 0) {
-            console.log('❌ No markets found in date range');
+            this.log('❌ No markets found in date range');
             return this.generateEmptyResult();
         }
 
         // Step 2: Fetch Binance klines for entire period
-        console.log('📡 Step 2: Fetching Binance BTC prices...');
+        this.log('📡 Step 2: Fetching Binance BTC prices...');
         const btcKlines = await this.binanceFetcher.fetch(startTs, endTs);
         this.currentKlines = btcKlines;
-        console.log(`   Loaded ${btcKlines.length} price points\n`);
+        this.log(`   Loaded ${btcKlines.length} price points\n`);
 
         // Step 3: Fetch Deribit volatility for entire period
-        console.log('📡 Step 3: Fetching Deribit DVOL...');
+        this.log('📡 Step 3: Fetching Deribit DVOL...');
         const volPoints = await this.volFetcher.fetch(startTs, endTs);
-        console.log(`   Loaded ${volPoints.length} volatility points\n`);
+        this.log(`   Loaded ${volPoints.length} volatility points\n`);
 
         // Step 4: Fetch Chainlink prices for market resolution
-        console.log('📡 Step 4: Fetching Chainlink oracle prices...');
+        this.log('📡 Step 4: Fetching Chainlink oracle prices...');
         const chainlinkPrices = await this.chainlinkFetcher.fetch(startTs, endTs);
-        console.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
+        this.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
 
         // Step 4b: Initialize DivergenceCalculator if using adaptive adjustment
         if (this.config.adjustmentMethod !== 'static' && !this.config.useChainlinkForFairValue) {
-            console.log('📊 Initializing DivergenceCalculator for adaptive adjustment...');
+            this.log('📊 Initializing DivergenceCalculator for adaptive adjustment...');
             this.divergenceCalculator = new DivergenceCalculator(chainlinkPrices, btcKlines);
-            console.log('');
+            this.log('');
         }
 
         // Step 5: Process each market
-        console.log('⚙️ Step 5: Processing markets...\n');
+        this.log('⚙️ Step 5: Processing markets...\n');
         let processedMarkets = 0;
 
         for (const market of markets) {
             // Skip markets without strike price
             if (!market.strikePrice || market.strikePrice <= 0) {
-                console.log(`   ⏭️ Skipping ${market.question.slice(0, 40)}... (no strike price)`);
+                this.log(`   ⏭️ Skipping ${market.question.slice(0, 40)}... (no strike price)`);
                 continue;
             }
 
@@ -232,11 +247,11 @@ export class Simulator {
             processedMarkets++;
 
             if (processedMarkets % 10 === 0) {
-                console.log(`   Processed ${processedMarkets}/${markets.length} markets...`);
+                this.log(`   Processed ${processedMarkets}/${markets.length} markets...`);
             }
         }
 
-        console.log(`\n✅ Processed ${processedMarkets} markets\n`);
+        this.log(`\n✅ Processed ${processedMarkets} markets\n`);
 
         // Generate results
         return this.generateResult();
@@ -296,10 +311,10 @@ export class Simulator {
 
             // Log significant divergence (> $50 difference)
             if (binancePrice && Math.abs(chainlinkPoint.price - binancePrice) > 50) {
-                console.log(`   ⚠️ Oracle divergence at ${new Date(market.endTime).toISOString()}: Chainlink=$${chainlinkPoint.price.toFixed(2)}, Binance=$${binancePrice.toFixed(2)}`);
+                this.log(`   ⚠️ Oracle divergence at ${new Date(market.endTime).toISOString()}: Chainlink=$${chainlinkPoint.price.toFixed(2)}, Binance=$${binancePrice.toFixed(2)}`);
             }
         } else {
-            console.warn(`   ⚠️ No Chainlink price for ${new Date(market.endTime).toISOString()}, using Binance`);
+            this.warn(`   ⚠️ No Chainlink price for ${new Date(market.endTime).toISOString()}, using Binance`);
             finalBtcPrice = binancePrice!;
         }
 

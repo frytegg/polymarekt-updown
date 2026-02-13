@@ -189,6 +189,7 @@ export interface BacktestConfig {
     maxTradesPerMarket: number; // Max total trades per market across both sides (default: 3)
     maxOrderUsd: number;       // Max USD per order (default: Infinity = share-based only)
     maxPositionUsd: number;    // Max USD per market position (default: Infinity = share-based only)
+    silent: boolean;           // Suppress console output during run(). Default: false. For programmatic use.
 }
 
 /**
