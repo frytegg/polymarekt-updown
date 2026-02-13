@@ -28,6 +28,7 @@ import { BlackScholesStrategy } from '../../core/strategies';
 import { DivergenceCalculator } from './divergence-calculator';
 import { createLogger } from '../../core/logger';
 import { calculateRealizedVol as coreCalculateRealizedVol } from '../../core/vol-calculator';
+import { DataBundle } from './data-bundle';
 
 const DEFAULT_CONFIG: BacktestConfig = {
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -161,7 +162,7 @@ export class Simulator {
     /**
      * Run the backtest
      */
-    async run(): Promise<BacktestResult> {
+    async run(bundle?: DataBundle): Promise<BacktestResult> {
         this.log('\n🚀 Starting Backtest...\n');
         this.log(`📅 Period: ${this.config.startDate.toISOString()} to ${this.config.endDate.toISOString()}`);
         this.log(`💰 Capital: ${this.config.initialCapital === Infinity ? 'Unlimited' : `$${this.config.initialCapital}`}`);
@@ -199,31 +200,48 @@ export class Simulator {
         this.deployedCapital = 0;
         this.peakDeployedCapital = 0;
 
-        // Step 1: Fetch all historical markets
-        this.log('📡 Step 1: Fetching historical markets...');
-        const markets = await this.marketsFetcher.fetch(startTs, endTs);
-        this.log(`   Found ${markets.length} markets\n`);
+        // Load data: use pre-loaded DataBundle if provided, otherwise fetch from disk/API
+        let markets: HistoricalMarket[];
+        let btcKlines: BinanceKline[];
+        let volPoints: DeribitVolPoint[];
+        let chainlinkPrices: ChainlinkPricePoint[];
+
+        if (bundle) {
+            // Use pre-loaded data from DataBundle (sweep/optimizer mode)
+            this.log('📦 Using pre-loaded DataBundle (shared data)');
+            markets = bundle.data.markets;
+            btcKlines = bundle.data.btcKlines;
+            volPoints = bundle.data.volPoints;
+            chainlinkPrices = bundle.data.chainlinkPrices;
+            this.currentKlines = btcKlines;
+            this.log(`   ${markets.length} markets, ${btcKlines.length} klines, ${volPoints.length} vol points, ${chainlinkPrices.length} Chainlink points\n`);
+        } else {
+            // Step 1: Fetch all historical markets
+            this.log('📡 Step 1: Fetching historical markets...');
+            markets = await this.marketsFetcher.fetch(startTs, endTs);
+            this.log(`   Found ${markets.length} markets\n`);
+
+            // Step 2: Fetch Binance klines for entire period
+            this.log('📡 Step 2: Fetching Binance BTC prices...');
+            btcKlines = await this.binanceFetcher.fetch(startTs, endTs);
+            this.currentKlines = btcKlines;
+            this.log(`   Loaded ${btcKlines.length} price points\n`);
+
+            // Step 3: Fetch Deribit volatility for entire period
+            this.log('📡 Step 3: Fetching Deribit DVOL...');
+            volPoints = await this.volFetcher.fetch(startTs, endTs);
+            this.log(`   Loaded ${volPoints.length} volatility points\n`);
+
+            // Step 4: Fetch Chainlink prices for market resolution
+            this.log('📡 Step 4: Fetching Chainlink oracle prices...');
+            chainlinkPrices = await this.chainlinkFetcher.fetch(startTs, endTs);
+            this.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
+        }
 
         if (markets.length === 0) {
             this.log('❌ No markets found in date range');
             return this.generateEmptyResult();
         }
-
-        // Step 2: Fetch Binance klines for entire period
-        this.log('📡 Step 2: Fetching Binance BTC prices...');
-        const btcKlines = await this.binanceFetcher.fetch(startTs, endTs);
-        this.currentKlines = btcKlines;
-        this.log(`   Loaded ${btcKlines.length} price points\n`);
-
-        // Step 3: Fetch Deribit volatility for entire period
-        this.log('📡 Step 3: Fetching Deribit DVOL...');
-        const volPoints = await this.volFetcher.fetch(startTs, endTs);
-        this.log(`   Loaded ${volPoints.length} volatility points\n`);
-
-        // Step 4: Fetch Chainlink prices for market resolution
-        this.log('📡 Step 4: Fetching Chainlink oracle prices...');
-        const chainlinkPrices = await this.chainlinkFetcher.fetch(startTs, endTs);
-        this.log(`   Loaded ${chainlinkPrices.length} Chainlink price points\n`);
 
         // Step 4b: Initialize DivergenceCalculator if using adaptive adjustment
         if (this.config.adjustmentMethod !== 'static' && !this.config.useChainlinkForFairValue) {
