@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-13T01:07:38.548Z",
+  "generatedAt": "2026-02-13T01:55:23.912Z",
   "requestedRange": {
     "start": "2026-01-06T00:00:00.000Z",
     "end": "2026-01-30T23:59:59.999Z"
@@ -27,17 +27,17 @@
       "source": "deribit",
       "earliestDate": "2025-12-12T00:00:00.000Z",
       "latestDate": "2026-02-12T23:59:59.999Z",
-      "fileCount": 10,
-      "totalSizeMb": 0.6732625961303711,
+      "fileCount": 11,
+      "totalSizeMb": 0.680201530456543,
       "gaps": [],
       "warnings": []
     },
     {
       "source": "polymarket",
-      "earliestDate": "2025-12-12T00:00:00.000Z",
+      "earliestDate": "2025-11-15T00:00:00.000Z",
       "latestDate": "2026-02-12T23:59:59.999Z",
-      "fileCount": 10,
-      "totalSizeMb": 8.220909118652344,
+      "fileCount": 11,
+      "totalSizeMb": 13.165608406066895,
       "gaps": [],
       "warnings": []
     }
@@ -49,9 +49,9 @@
   },
   "polymarket": {
     "totalMarkets": 2393,
-    "marketsWithPrices": 2348,
-    "marketsMissingPrices": 45,
-    "coveragePct": 98.11951525282073
+    "marketsWithPrices": 2379,
+    "marketsMissingPrices": 14,
+    "coveragePct": 99.41496030087757
   },
   "recommendations": [
     "Extend chainlink backward to reach 60-day intersection (currently 40 days)"
