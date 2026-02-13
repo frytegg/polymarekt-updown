@@ -242,9 +242,13 @@ Examples:
 // CACHE GAP DETECTION
 // =============================================================================
 
+/** Max reasonable date: 1 year from now. Files beyond this are test artifacts. */
+const MAX_REASONABLE_DATE = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
 /**
  * Parse date range from a cache filename.
  * Supports patterns: {prefix}_{startDate}_{endDate}[_suffix].json
+ * Filters out files with dates beyond MAX_REASONABLE_DATE (test artifacts).
  */
 function parseDatesFromFilename(filename: string): { start: Date; end: Date } | null {
     // Match YYYY-MM-DD patterns in filename
@@ -255,6 +259,10 @@ function parseDatesFromFilename(filename: string): { start: Date; end: Date } | 
     const end = new Date(dateMatches[1] + 'T23:59:59.999Z');
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+
+    // Skip files with bogus future dates (e.g., test artifacts like 2099-01-01)
+    if (start > MAX_REASONABLE_DATE || end > MAX_REASONABLE_DATE) return null;
+
     return { start, end };
 }
 
