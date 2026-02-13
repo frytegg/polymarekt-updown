@@ -16,6 +16,8 @@
  *   6. Logger mode field is correct per execution mode
  *   7. Backtest --initial-capital shows capital metrics
  *   8. Backtest reads .env risk params as defaults
+ *   9. fetch-range --dry-run shows plan without fetching
+ *  10. fetch-range --report-only generates coverage report
  */
 
 import { spawn, ChildProcess } from 'child_process';
@@ -687,6 +689,112 @@ async function test8_EnvDefaults(dateRange: { start: string; end: string } | nul
   };
 }
 
+/**
+ * Test 9: fetch-range --dry-run shows plan without fetching
+ */
+async function test9_FetchRangeDryRun(): Promise<TestResult> {
+  const startTime = Date.now();
+
+  const result = await spawnProcess({
+    command: 'npx',
+    args: [
+      'ts-node',
+      'scripts/fetch-range.ts',
+      '--from', '2026-01-06',
+      '--to', '2026-01-30',
+      '--dry-run',
+    ],
+    timeout: 15000,
+  });
+
+  const duration = (Date.now() - startTime) / 1000;
+
+  const check = checkConditions(result.stdout, result.stderr, result.exitCode, {
+    stdoutContains: [
+      'DRY RUN',
+      /binance|chainlink|deribit|polymarket/i,
+    ],
+    exitCode: 0,
+  });
+
+  if (!check.pass) {
+    return {
+      name: 'fetch-range --dry-run',
+      status: 'fail',
+      duration,
+      message: check.failedCondition,
+      debugInfo: {
+        stdout: result.stdout.slice(-500),
+        stderr: result.stderr.slice(-500),
+      },
+    };
+  }
+
+  return {
+    name: 'fetch-range --dry-run',
+    status: 'pass',
+    duration,
+  };
+}
+
+/**
+ * Test 10: fetch-range --report-only generates coverage report
+ */
+async function test10_FetchRangeReportOnly(): Promise<TestResult> {
+  const startTime = Date.now();
+
+  const result = await spawnProcess({
+    command: 'npx',
+    args: [
+      'ts-node',
+      'scripts/fetch-range.ts',
+      '--from', '2026-01-06',
+      '--to', '2026-01-30',
+      '--report-only',
+    ],
+    timeout: 15000,
+  });
+
+  const duration = (Date.now() - startTime) / 1000;
+
+  // Check report file was created
+  const reportPath = path.join(__dirname, '..', 'data', 'coverage-report.md');
+  const reportExists = fs.existsSync(reportPath);
+
+  const check = checkConditions(result.stdout, result.stderr, result.exitCode, {
+    stdoutContains: [/coverage report/i],
+    exitCode: 0,
+  });
+
+  if (!check.pass) {
+    return {
+      name: 'fetch-range --report-only',
+      status: 'fail',
+      duration,
+      message: check.failedCondition,
+      debugInfo: {
+        stdout: result.stdout.slice(-500),
+        stderr: result.stderr.slice(-500),
+      },
+    };
+  }
+
+  if (!reportExists) {
+    return {
+      name: 'fetch-range --report-only',
+      status: 'fail',
+      duration,
+      message: 'data/coverage-report.md not created',
+    };
+  }
+
+  return {
+    name: 'fetch-range --report-only',
+    status: 'pass',
+    duration,
+  };
+}
+
 // =============================================================================
 // MAIN
 // =============================================================================
@@ -717,6 +825,8 @@ async function main() {
     { name: 'Test 6', fn: () => test6_LoggerModeField(dateRange) },
     { name: 'Test 7', fn: () => test7_CapitalMetrics(dateRange) },
     { name: 'Test 8', fn: () => test8_EnvDefaults(dateRange) },
+    { name: 'Test 9', fn: test9_FetchRangeDryRun },
+    { name: 'Test 10', fn: test10_FetchRangeReportOnly },
   ];
 
   for (let i = 0; i < tests.length; i++) {
