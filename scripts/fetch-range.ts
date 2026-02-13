@@ -297,6 +297,7 @@ function unionRanges(ranges: Array<{ start: Date; end: Date }>): Array<{ start: 
 
 /**
  * Compute gaps between a requested range and the union of cached ranges.
+ * Clamps all ranges to [requestedStart, requestedEnd] and validates start < end.
  */
 function computeGaps(
     requestedStart: Date,
@@ -307,19 +308,24 @@ function computeGaps(
         return [{ start: requestedStart, end: requestedEnd }];
     }
 
+    const reqStart = requestedStart.getTime();
+    const reqEnd = requestedEnd.getTime();
     const gaps: Array<{ start: Date; end: Date }> = [];
-    let currentStart = requestedStart.getTime();
+    let currentStart = reqStart;
 
     for (const range of coveredRanges) {
         const rangeStart = range.start.getTime();
         const rangeEnd = range.end.getTime();
 
-        // Gap before this range
+        // Gap before this range (clamped to requested window)
         if (currentStart < rangeStart) {
-            gaps.push({
-                start: new Date(currentStart),
-                end: new Date(Math.min(rangeStart, requestedEnd.getTime())),
-            });
+            const gapEnd = Math.min(rangeStart, reqEnd);
+            if (currentStart < gapEnd) {
+                gaps.push({
+                    start: new Date(currentStart),
+                    end: new Date(gapEnd),
+                });
+            }
         }
 
         // Move past this range
@@ -327,11 +333,18 @@ function computeGaps(
     }
 
     // Gap after last range
-    if (currentStart < requestedEnd.getTime()) {
+    if (currentStart < reqEnd) {
         gaps.push({
             start: new Date(currentStart),
             end: requestedEnd,
         });
+    }
+
+    // Defensive: assert no invalid gaps survived
+    for (const gap of gaps) {
+        if (gap.start.getTime() >= gap.end.getTime()) {
+            throw new Error(`BUG: Invalid gap detected: ${gap.start.toISOString()} >= ${gap.end.toISOString()}`);
+        }
     }
 
     return gaps;
@@ -655,11 +668,13 @@ function generateCoverageReport(
         const stats = getDirectoryStats(config.dataDir, prefix);
 
         const analysis = analyses.get(source);
-        const gaps = analysis ? analysis.gaps.map(g => ({
-            start: g.start,
-            end: g.end,
-            durationHours: (g.end.getTime() - g.start.getTime()) / (3600 * 1000),
-        })) : [];
+        const gaps = analysis ? analysis.gaps
+            .filter(g => g.end.getTime() > g.start.getTime())  // Defensive: skip invalid
+            .map(g => ({
+                start: g.start,
+                end: g.end,
+                durationHours: (g.end.getTime() - g.start.getTime()) / (3600 * 1000),
+            })) : [];
 
         const warnings: string[] = [];
         if (source === 'chainlink') {
