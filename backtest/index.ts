@@ -212,9 +212,11 @@ function parseArgs(): {
             case '--no-fees':
                 result.fees = false;
                 break;
-            case '--slippage':
-                result.slippageBps = parseInt(args[++i], 10) || 200;
+            case '--slippage': {
+                const parsedSlippage = parseInt(args[++i], 10);
+                result.slippageBps = isNaN(parsedSlippage) ? 200 : parsedSlippage;
                 break;
+            }
             case '--cooldown-ms':
                 result.cooldownMs = parseInt(args[++i], 10) || 60000;
                 break;
