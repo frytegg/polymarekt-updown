@@ -29,6 +29,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 import { Simulator } from './engine/simulator';
+import { DataBundle } from './engine/data-bundle';
 import { BacktestConfig, BacktestMode, AdjustmentMethod } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
@@ -662,12 +663,15 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
     
     const results: SweepResult[] = [];
     const edgeValues: number[] = [];
-    
+
     for (let edge = args.sweepMin; edge <= args.sweepMax; edge += args.sweepStep) {
         edgeValues.push(edge);
     }
-    
-    console.log(`\n🔄 Running ${edgeValues.length} backtests...\n`);
+
+    // Pre-load all data once via DataBundle (avoids N redundant fetches)
+    const bundle = await DataBundle.load(startDate, endDate);
+
+    console.log(`🔄 Running ${edgeValues.length} backtests...\n`);
     
     for (let i = 0; i < edgeValues.length; i++) {
         const edge = edgeValues[i];
@@ -695,11 +699,12 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             maxTradesPerMarket: args.maxTrades,
             maxOrderUsd: args.maxOrderUsd,
             maxPositionUsd: args.maxPositionUsd,
+            silent: true,  // Suppress per-run output in sweep mode
         };
 
         try {
             const simulator = new Simulator(config);
-            const result = await simulator.run();
+            const result = await simulator.run(bundle);
             const stats = calculateStatistics(result);
             
             // Calculate ROI: use capital-based if finite, otherwise share-based
