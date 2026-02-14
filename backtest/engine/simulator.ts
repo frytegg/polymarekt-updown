@@ -100,6 +100,9 @@ export class Simulator {
     private deployedCapital: number = 0;          // Capital currently in open positions
     private peakDeployedCapital: number = 0;      // Maximum capital deployed at any point
 
+    // Mark-to-market fair values (for Kelly sizing)
+    private lastKnownFairValueYes: Map<string, number> = new Map(); // key: marketId → P(YES)
+
     // Logging — structured logger for non-silenceable logs
     private logger = createLogger('Backtest:Simulator', { mode: 'backtest' });
 
@@ -196,6 +199,7 @@ export class Simulator {
         this.orderMatcher.reset();
         this.lastTradeTimestamp.clear();
         this.marketTradeCount.clear();
+        this.lastKnownFairValueYes.clear();
 
         // Reset capital tracking
         this.availableCapital = this.config.initialCapital;
@@ -364,6 +368,30 @@ export class Simulator {
             this.deployedCapital -= totalCost;
             this.availableCapital += totalPayout;
         }
+
+        // Clean up MTM price for resolved market
+        this.lastKnownFairValueYes.delete(market.conditionId);
+    }
+
+    /**
+     * Compute mark-to-market equity: cash + sum(open positions valued at fair value).
+     * Used by Kelly sizing to determine bet size relative to current portfolio value.
+     *
+     * equity_mtm = availableCapital + sum(position_i.yesShares × fvYes_i + position_i.noShares × (1 - fvYes_i))
+     */
+    private computeEquityMTM(): number {
+        let positionValue = 0;
+        const positions = this.positionTracker.getAllPositions();
+        for (const pos of positions) {
+            const fvYes = this.lastKnownFairValueYes.get(pos.marketId);
+            if (fvYes !== undefined) {
+                positionValue += pos.yesShares * fvYes + pos.noShares * (1 - fvYes);
+            } else {
+                // Fallback: value at cost basis (conservative — no fair value available yet)
+                positionValue += pos.yesCost + pos.noCost;
+            }
+        }
+        return this.availableCapital + positionValue;
     }
 
     /**
@@ -523,6 +551,9 @@ export class Simulator {
             tick.timeRemainingMs / 1000, // Convert to seconds
             adjustedVol
         );
+
+        // Update MTM price map (used by Kelly sizing)
+        this.lastKnownFairValueYes.set(market.conditionId, fairValue.pUp);
 
         // Check YES opportunity
         this.checkAndTrade(market, tick, fairValue, 'YES', tick.polyMidYes);
