@@ -100,6 +100,9 @@ export class Simulator {
     // Mark-to-market fair values (for Kelly sizing)
     private lastKnownFairValueYes: Map<string, number> = new Map(); // key: marketId → P(YES)
 
+    // Warmup: no trades during first 30 min (aligns with live EMA readiness check)
+    private warmupEndTimestamp: number = 0; // Set in run() to startDate + 30 min
+
     // Logging — structured logger for non-silenceable logs
     private logger = createLogger('Backtest:Simulator', { mode: 'backtest' });
 
@@ -179,6 +182,7 @@ export class Simulator {
         this.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
         this.log(`📉 Slippage: ${this.config.slippageBps} bps${this.config.slippageBps === 0 ? ' ⚠️  Live trading uses 200 bps. Results may be overly optimistic.' : ''}`);
         this.log(`🔄 Cooldown: ${this.config.cooldownMs}ms | Max Trades/Market: ${this.config.maxTradesPerMarket}`);
+        this.log(`⏳ Warmup: 30 min (no trades until EMA is primed)`);
         if (this.config.maxOrderUsd < Infinity || this.config.maxPositionUsd < Infinity) {
             this.log(`💵 USD Limits: Order=$${this.config.maxOrderUsd}, Position=$${this.config.maxPositionUsd}`);
         }
@@ -193,6 +197,10 @@ export class Simulator {
         this.lastTradeTimestamp.clear();
         this.marketTradeCount.clear();
         this.lastKnownFairValueYes.clear();
+
+        // Warmup: skip trades for first 30 minutes (aligns with live EMA readiness)
+        const WARMUP_MS = 30 * 60 * 1000; // 30 minutes
+        this.warmupEndTimestamp = startTs + WARMUP_MS;
 
         // Reset capital tracking
         this.availableCapital = this.config.initialCapital;
@@ -549,6 +557,9 @@ export class Simulator {
 
         // Update MTM price map (used by Kelly sizing)
         this.lastKnownFairValueYes.set(market.conditionId, fairValue.pUp);
+
+        // Warmup guard: feed EMA and compute fair values, but don't trade yet
+        if (tick.timestamp < this.warmupEndTimestamp) return;
 
         // Check YES opportunity
         this.checkAndTrade(market, tick, fairValue, 'YES', tick.polyMidYes);
