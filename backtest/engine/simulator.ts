@@ -673,8 +673,18 @@ export class Simulator {
         // Time remaining from execution timestamp
         const execTimeRemainingMs = market.endTime - executionTs;
 
-        // Calculate effective order size (respect USD limits if set)
-        let effectiveSize = this.config.orderSize;
+        // Calculate effective order size
+        let effectiveSize: number;
+        if (this.config.sizingMode === 'kelly') {
+            // Kelly criterion: bet = equity × kellyFraction × (edge / (1 - buyPrice))
+            const equityMTM = this.computeEquityMTM();
+            const kellyOptimal = edge / (1 - buyPrice);
+            const betUsd = equityMTM * this.config.kellyFraction * kellyOptimal;
+            effectiveSize = Math.floor(betUsd / buyPrice);
+            if (effectiveSize <= 0) return;
+        } else {
+            effectiveSize = this.config.orderSize;
+        }
         if (this.config.maxOrderUsd < Infinity) {
             const maxSharesByUsd = Math.floor(this.config.maxOrderUsd / buyPrice);
             effectiveSize = Math.min(effectiveSize, maxSharesByUsd);
