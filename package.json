@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "test:smoke": "npx ts-node scripts/smoke-test.ts",
     "fetch-data": "npx ts-node scripts/fetch-range.ts",
-    "data-report": "npx ts-node scripts/fetch-range.ts --report-only"
+    "data-report": "npx ts-node scripts/fetch-range.ts --report-only",
+    "optimize": "npx ts-node backtest/optimizer/index.ts",
+    "test:sizing": "npx ts-node backtest/optimizer/test-sizing-regression.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.2.0",
