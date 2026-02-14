@@ -640,6 +640,11 @@ export class ChainlinkHistoricalFetcher {
     return this.cache;
   }
 
+  /** Populate cache from external data (e.g., DataBundle). Avoids redundant fetch. */
+  setData(prices: ChainlinkPricePoint[]): void {
+    this.cache = prices;
+  }
+
   getPriceAt(timestamp: number): number | null {
     return getChainlinkPriceValueAt(this.cache, timestamp);
   }

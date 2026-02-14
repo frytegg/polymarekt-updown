@@ -220,6 +220,9 @@ export class Simulator {
             volPoints = bundle.data.volPoints;
             chainlinkPrices = bundle.data.chainlinkPrices;
             this.currentKlines = btcKlines;
+            // Populate fetcher caches so resolution lookups (getPriceAt, getClosestPrice) work
+            this.binanceFetcher.setData(btcKlines);
+            this.chainlinkFetcher.setData(chainlinkPrices);
             this.log(`   ${markets.length} markets, ${btcKlines.length} klines, ${volPoints.length} vol points, ${chainlinkPrices.length} Chainlink points\n`);
         } else {
             // Step 1: Fetch all historical markets

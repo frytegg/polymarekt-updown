@@ -352,6 +352,11 @@ export class BinanceHistoricalFetcher {
     return this.cache;
   }
 
+  /** Populate cache from external data (e.g., DataBundle). Avoids redundant fetch. */
+  setData(klines: BinanceKline[]): void {
+    this.cache = klines;
+  }
+
   getPriceAt(timestamp: number): number {
     return getBtcPriceAt(this.cache, timestamp);
   }
