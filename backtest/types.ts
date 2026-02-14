@@ -164,6 +164,13 @@ export type BacktestMode = 'normal' | 'conservative';
 export type AdjustmentMethod = 'static' | 'rolling-mean' | 'ema' | 'median';
 
 /**
+ * Sizing mode for order sizing strategy
+ * - 'fixed': Fixed share count (config.orderSize), existing behavior
+ * - 'kelly': Kelly criterion with mark-to-market equity
+ */
+export type SizingMode = 'fixed' | 'kelly';
+
+/**
  * Backtest configuration
  */
 export interface BacktestConfig {
@@ -190,6 +197,8 @@ export interface BacktestConfig {
     maxOrderUsd: number;       // Max USD per order (default: Infinity = share-based only)
     maxPositionUsd: number;    // Max USD per market position (default: Infinity = share-based only)
     silent: boolean;           // Suppress console output during run(). Default: false. For programmatic use.
+    sizingMode: SizingMode;    // Order sizing strategy (default: 'fixed')
+    kellyFraction: number;     // Fraction of full Kelly to use (default: 0.5 = half-Kelly)
 }
 
 /**

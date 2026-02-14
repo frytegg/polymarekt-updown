@@ -53,6 +53,8 @@ const DEFAULT_CONFIG: BacktestConfig = {
     maxOrderUsd: Infinity,    // No USD limit by default (use share-based limits)
     maxPositionUsd: Infinity, // No USD position limit by default
     silent: false,            // Print output by default (CLI behavior unchanged)
+    sizingMode: 'fixed',      // Fixed share count by default (backward compat)
+    kellyFraction: 0.5,       // Half-Kelly by default (only used when sizingMode='kelly')
 };
 
 /**

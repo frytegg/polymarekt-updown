@@ -30,7 +30,7 @@ dotenv.config();
 
 import { Simulator } from './engine/simulator';
 import { DataBundle } from './engine/data-bundle';
-import { BacktestConfig, BacktestMode, AdjustmentMethod } from './types';
+import { BacktestConfig, BacktestMode, AdjustmentMethod, SizingMode } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
 import { printPnLCurve, printDrawdownAnalysis, exportPnLCurveToCsv } from './output/pnl-curve';
@@ -73,6 +73,8 @@ function parseArgs(): {
     initialCapital: number;
     initialCapitalSource: 'cli' | 'env' | 'default';
     cacheInfo: boolean;
+    sizing: SizingMode;
+    kellyFraction: number;
 } {
     const args = process.argv.slice(2);
 
@@ -130,6 +132,8 @@ function parseArgs(): {
         initialCapital: envDefaults.initialCapital,
         initialCapitalSource: (process.env.ARB_MAX_TOTAL_USD ? 'env' : 'default') as 'cli' | 'env' | 'default',
         cacheInfo: false,
+        sizing: 'fixed' as SizingMode,
+        kellyFraction: 0.5,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -239,6 +243,25 @@ function parseArgs(): {
             case '--cache-info':
                 result.cacheInfo = true;
                 break;
+            case '--sizing': {
+                const sizingVal = args[++i] as SizingMode;
+                if (['fixed', 'kelly'].includes(sizingVal)) {
+                    result.sizing = sizingVal;
+                } else {
+                    console.error(`Invalid sizing mode: ${sizingVal}. Use: fixed, kelly`);
+                    process.exit(1);
+                }
+                break;
+            }
+            case '--kelly-fraction': {
+                const kf = parseFloat(args[++i]);
+                if (isNaN(kf) || kf <= 0 || kf > 1) {
+                    console.error(`Invalid kelly-fraction: must be >0 and <=1`);
+                    process.exit(1);
+                }
+                result.kellyFraction = kf;
+                break;
+            }
             case '--help':
             case '-h':
                 printHelp();
@@ -316,6 +339,9 @@ Options:
                          Set to simulate realistic returns on your actual bankroll
   --max-order-usd <$>    Max USD per order (default: .env ARB_MAX_ORDER_USD or unlimited)
   --max-position-usd <$> Max USD per market (default: .env ARB_MAX_POSITION_USD or unlimited)
+  --sizing <mode>        Order sizing: fixed (default) or kelly (Kelly criterion with MTM equity)
+  --kelly-fraction <f>   Fraction of full Kelly to bet (default: 0.5 = half-Kelly, range: 0-1)
+                         Only used when --sizing kelly. Requires --initial-capital.
 
   Note: Risk parameters default to your .env config if present.
         CLI flags always override .env values.
@@ -700,6 +726,8 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             maxOrderUsd: args.maxOrderUsd,
             maxPositionUsd: args.maxPositionUsd,
             silent: true,  // Suppress per-run output in sweep mode
+            sizingMode: args.sizing,
+            kellyFraction: args.kellyFraction,
         };
 
         try {
@@ -841,6 +869,8 @@ async function main(): Promise<void> {
         maxTradesPerMarket: args.maxTrades,
         maxOrderUsd: args.maxOrderUsd,
         maxPositionUsd: args.maxPositionUsd,
+        sizingMode: args.sizing,
+        kellyFraction: args.kellyFraction,
     };
 
     // Helper function to format source attribution
@@ -855,7 +885,11 @@ async function main(): Promise<void> {
     console.log(`   Period:      ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
     console.log(`   Spread:      ${args.spread}¢ (buy at mid + ${args.spread / 2}¢)`);
     console.log(`   Min Edge:    ${args.edge}% ${formatSource(args.edgeSource)}`);
-    console.log(`   Order Size:  ${args.size} shares`);
+    if (args.sizing === 'kelly') {
+        console.log(`   Sizing:      KELLY (fraction: ${args.kellyFraction})`);
+    } else {
+        console.log(`   Order Size:  ${args.size} shares`);
+    }
     console.log(`   Max Pos:     ${args.maxPos} shares per side`);
     console.log(`   Lag:         ${args.lag}s`);
     console.log(`   Latency:     ${args.latencyMs}ms${args.mode === 'conservative' ? ' (auto: 200ms)' : ''}`);
