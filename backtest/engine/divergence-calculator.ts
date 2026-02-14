@@ -8,7 +8,7 @@
  * works with pre-fetched historical data for backtest simulation.
  */
 
-import { BinanceKline, AdjustmentMethod } from '../types';
+import { BinanceKline } from '../types';
 import { ChainlinkPricePoint } from '../fetchers/chainlink-historical';
 
 // =============================================================================
@@ -123,41 +123,26 @@ export class DivergenceCalculator {
   }
 
   /**
-   * Get the adjustment to apply at a given timestamp
+   * Get the EMA adjustment to apply at a given timestamp.
    *
    * @param timestamp - The timestamp to calculate adjustment for
-   * @param method - The adjustment method to use
+   * @param _method - Unused, kept for call-site compat (always EMA)
    * @param windowHours - Rolling window size in hours
-   * @param fallback - Fallback value if not enough data (default: -104)
-   * @returns Adjustment value (negative, to subtract from Binance price)
+   * @returns Adjustment value (negative of EMA divergence), or 0 during warmup
    */
   getAdjustment(
     timestamp: number,
-    method: AdjustmentMethod,
+    _method: string,
     windowHours: number,
-    fallback: number = -104
   ): number {
-    if (method === 'static') {
-      return fallback;
-    }
-
     const stats = this.getStatsAtTime(timestamp, windowHours);
 
     if (stats.count < 5) {
-      // Not enough data, use fallback
-      return fallback;
+      // Not enough data during warmup — return 0 (no adjustment)
+      return 0;
     }
 
-    switch (method) {
-      case 'rolling-mean':
-        return -stats.mean;
-      case 'ema':
-        return -stats.ema;
-      case 'median':
-        return -stats.median;
-      default:
-        return fallback;
-    }
+    return -stats.ema;
   }
 
   /**

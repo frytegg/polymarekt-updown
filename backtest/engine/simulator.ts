@@ -14,7 +14,6 @@ import {
     BinanceKline,
     PolymarketPricePoint,
     DeribitVolPoint,
-    AdjustmentMethod,
 } from '../types';
 
 import { BinanceHistoricalFetcher } from '../fetchers/binance-historical';
@@ -43,9 +42,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
     useChainlinkForFairValue: false, // Use Binance by default
     volMultiplier: 1.0,       // No vol adjustment by default
     mode: 'normal',           // Normal mode by default
-    binanceChainlinkAdjustment: 0, // No adjustment by default (set to -104 for divergence correction)
-    adjustmentMethod: 'static', // Static adjustment by default
-    adjustmentWindowHours: 2,   // 2-hour rolling window for adaptive methods
+    adjustmentWindowHours: 2,   // 2-hour EMA window for Binance→Chainlink correction
     includeFees: true,        // Fees ON by default — matches live trading. Use --no-fees to disable.
     slippageBps: 200,         // 200 bps (2%) matching live ARB_SLIPPAGE_BPS default
     cooldownMs: 60000,        // 60s cooldown between trades per market+side (1 per tick)
@@ -176,11 +173,7 @@ export class Simulator {
         this.log(`⏱️ Lag: ${this.config.lagSeconds}s (BTC price delay before Poly execution)`);
         this.log(`🔗 Fair Value Oracle: ${this.config.useChainlinkForFairValue ? 'CHAINLINK' : 'BINANCE'}`);
         if (!this.config.useChainlinkForFairValue) {
-            if (this.config.adjustmentMethod === 'static') {
-                this.log(`📐 Adjustment Method: STATIC ($${this.config.binanceChainlinkAdjustment})`);
-            } else {
-                this.log(`📐 Adjustment Method: ${this.config.adjustmentMethod.toUpperCase()} (${this.config.adjustmentWindowHours}h window, fallback: $${this.config.binanceChainlinkAdjustment})`);
-            }
+            this.log(`📐 Adjustment: EMA (${this.config.adjustmentWindowHours}h window)`);
         }
         this.log(`🎛️ Mode: ${this.config.mode.toUpperCase()} (worst-case: ${this.useWorstCasePricing ? 'ON' : 'OFF'}, latency: ${this.effectiveLatencyMs}ms)`);
         this.log(`💸 Fees: ${this.config.includeFees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
@@ -252,9 +245,9 @@ export class Simulator {
             return this.generateEmptyResult();
         }
 
-        // Step 4b: Initialize DivergenceCalculator if using adaptive adjustment
-        if (this.config.adjustmentMethod !== 'static' && !this.config.useChainlinkForFairValue) {
-            this.log('📊 Initializing DivergenceCalculator for adaptive adjustment...');
+        // Step 4b: Initialize DivergenceCalculator (EMA is the only adjustment method)
+        if (!this.config.useChainlinkForFairValue) {
+            this.log('📊 Initializing DivergenceCalculator (EMA adjustment)...');
             this.divergenceCalculator = new DivergenceCalculator(chainlinkPrices, btcKlines);
             this.log('');
         }
@@ -521,19 +514,18 @@ export class Simulator {
     }
 
     /**
-     * Get the adjustment to apply at a given timestamp
-     * Uses DivergenceCalculator if available, otherwise static adjustment
+     * Get the EMA adjustment to apply at a given timestamp.
+     * Returns 0 if DivergenceCalculator is not initialized (e.g. Chainlink mode).
      */
     private getAdjustmentAtTime(timestamp: number): number {
-        if (this.config.adjustmentMethod === 'static' || !this.divergenceCalculator) {
-            return this.config.binanceChainlinkAdjustment;
+        if (!this.divergenceCalculator) {
+            return 0;
         }
 
         return this.divergenceCalculator.getAdjustment(
             timestamp,
-            this.config.adjustmentMethod,
+            'ema',
             this.config.adjustmentWindowHours,
-            this.config.binanceChainlinkAdjustment
         );
     }
 
@@ -593,7 +585,7 @@ export class Simulator {
             const rawPrice = worstCaseKline
                 ? (side === 'YES' ? worstCaseKline.low : worstCaseKline.high)
                 : (tick.btcKline?.open ?? tick.btcPrice);
-            // Apply adjustment if using Binance (adaptive or static)
+            // Apply EMA adjustment if using Binance
             if (!this.config.useChainlinkForFairValue) {
                 const adjustment = this.getAdjustmentAtTime(tick.timestamp);
                 btcPriceForFV = rawPrice + adjustment;
@@ -663,7 +655,7 @@ export class Simulator {
                     // Use kline open (causal — close is not known yet)
                     rawExecPrice = execKline.open;
                 }
-                // Apply adjustment if using Binance (adaptive or static)
+                // Apply EMA adjustment if using Binance
                 if (!this.config.useChainlinkForFairValue) {
                     const adjustment = this.getAdjustmentAtTime(executionTs);
                     execBtcPrice = rawExecPrice + adjustment;

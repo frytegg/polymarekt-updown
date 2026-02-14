@@ -31,8 +31,6 @@ export interface RunnerBaseConfig {
     readonly mode: BacktestConfig['mode'];
     readonly volMultiplier?: number;
     readonly useChainlinkForFairValue?: boolean;
-    readonly binanceChainlinkAdjustment?: number;
-    readonly adjustmentMethod?: BacktestConfig['adjustmentMethod'];
     readonly adjustmentWindowHours?: number;
     readonly cooldownMs?: number;
     readonly maxTradesPerMarket?: number;
@@ -65,8 +63,6 @@ async function runCell(
         silent: true,
         volMultiplier: base.volMultiplier ?? 1.0,
         useChainlinkForFairValue: base.useChainlinkForFairValue ?? false,
-        binanceChainlinkAdjustment: base.binanceChainlinkAdjustment ?? 0,
-        adjustmentMethod: base.adjustmentMethod ?? 'static',
         adjustmentWindowHours: base.adjustmentWindowHours ?? 2,
         cooldownMs: base.cooldownMs ?? 60000,
         maxTradesPerMarket: base.maxTradesPerMarket ?? 3,

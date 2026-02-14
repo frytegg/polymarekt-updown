@@ -30,7 +30,7 @@ dotenv.config();
 
 import { Simulator } from './engine/simulator';
 import { DataBundle } from './engine/data-bundle';
-import { BacktestConfig, BacktestMode, AdjustmentMethod, SizingMode } from './types';
+import { BacktestConfig, BacktestMode, SizingMode } from './types';
 import { calculateStatistics, printStatistics, printEdgeDistribution } from './output/statistics';
 import { exportBacktestResult, printTradeLog, printResolutionLog } from './output/trade-log';
 import { printPnLCurve, printDrawdownAnalysis, exportPnLCurveToCsv } from './output/pnl-curve';
@@ -59,9 +59,6 @@ function parseArgs(): {
     sweepMax: number;
     sweepStep: number;
     useChainlink: boolean;
-    adjustment: number;
-    adjustmentMethod: AdjustmentMethod;
-    adjustmentWindow: number;
     fees: boolean;
     slippageBps: number;
     cooldownMs: number;
@@ -118,9 +115,6 @@ function parseArgs(): {
         sweepMax: 30,
         sweepStep: 2,
         useChainlink: false,
-        adjustment: 0,
-        adjustmentMethod: 'static' as AdjustmentMethod,
-        adjustmentWindow: 2,
         fees: true,   // Fees ON by default — matches live trading
         slippageBps: envDefaults.slippageBps,
         cooldownMs: 60000,
@@ -191,19 +185,10 @@ function parseArgs(): {
                 result.useChainlink = true;
                 break;
             case '--adjustment':
-                result.adjustment = parseFloat(args[++i]) || 0;
-                break;
             case '--adjustment-method':
-                const method = args[++i] as AdjustmentMethod;
-                if (['static', 'rolling-mean', 'ema', 'median'].includes(method)) {
-                    result.adjustmentMethod = method;
-                } else {
-                    console.error(`Invalid adjustment method: ${method}. Use: static, rolling-mean, ema, median`);
-                    process.exit(1);
-                }
-                break;
             case '--adjustment-window':
-                result.adjustmentWindow = parseFloat(args[++i]) || 2;
+                // Deprecated: EMA is now the only adjustment method. Skip the value arg.
+                i++;
                 break;
             case '--conservative':
                 result.mode = 'conservative';
@@ -303,18 +288,7 @@ Options:
                      Higher values = more conservative P(UP/DOWN) estimates
   --chainlink        Use Chainlink for fair value calculation (default: Binance)
                      Matches the oracle used for settlement
-  --adjustment <$>   Binance→Chainlink price adjustment in USD (default: 0)
-                     Set to -104 to correct for Chainlink being ~$104 lower than Binance
-                     Only applies when using Binance (not --chainlink mode)
-  --adjustment-method <method>
-                     Method for calculating adjustment (default: static)
-                     Options: static, rolling-mean, ema, median
-                     - static: Use fixed --adjustment value
-                     - rolling-mean: Rolling mean of Binance-Chainlink divergence
-                     - ema: Exponential moving average of divergence
-                     - median: Rolling median (robust to outliers)
-  --adjustment-window <hours>
-                     Rolling window size in hours for adaptive methods (default: 2)
+                     When using Binance, EMA divergence adjustment is applied automatically
 
   --normal           Normal mode (default): close price, no latency
   --conservative     Conservative mode: worst-case pricing (kline low/high), 200ms latency
@@ -376,8 +350,8 @@ Examples:
   # Sweep with realistic capital
   npx ts-node backtest/index.ts --from 2026-01-06 --to 2026-01-30 --initial-capital 100 --sweep
 
-  # Conservative mode with adjustment
-  npx ts-node backtest/index.ts --days 14 --adjustment -104 --conservative
+  # Conservative mode
+  npx ts-node backtest/index.ts --days 14 --conservative
 `);
 }
 
@@ -716,9 +690,6 @@ async function runEdgeSweep(args: ReturnType<typeof parseArgs>): Promise<void> {
             volMultiplier: args.volMultiplier,
             mode: args.mode,
             useChainlinkForFairValue: args.useChainlink,
-            binanceChainlinkAdjustment: args.adjustment,
-            adjustmentMethod: args.adjustmentMethod,
-            adjustmentWindowHours: args.adjustmentWindow,
             includeFees: args.fees,
             slippageBps: args.slippageBps,
             cooldownMs: args.cooldownMs,
@@ -860,9 +831,6 @@ async function main(): Promise<void> {
         useChainlinkForFairValue: args.useChainlink,
         volMultiplier: args.volMultiplier,
         mode: args.mode,
-        binanceChainlinkAdjustment: args.adjustment,
-        adjustmentMethod: args.adjustmentMethod,
-        adjustmentWindowHours: args.adjustmentWindow,
         includeFees: args.fees,
         slippageBps: args.slippageBps,
         cooldownMs: args.cooldownMs,
@@ -896,11 +864,7 @@ async function main(): Promise<void> {
     console.log(`   Vol Mult:    ${args.volMultiplier}x`);
     console.log(`   FV Oracle:   ${args.useChainlink ? 'CHAINLINK' : 'BINANCE'}`);
     if (!args.useChainlink) {
-        if (args.adjustmentMethod === 'static') {
-            console.log(`   Adjustment:  STATIC ($${args.adjustment})`);
-        } else {
-            console.log(`   Adjustment:  ${args.adjustmentMethod.toUpperCase()} (${args.adjustmentWindow}h window, fallback: $${args.adjustment})`);
-        }
+        console.log(`   Adjustment:  EMA (2h window)`);
     }
     console.log(`   Fees:        ${args.fees ? 'ENABLED (Polymarket taker fees)' : 'DISABLED'}`);
     console.log(`   Slippage:    ${args.slippageBps} bps${args.slippageBps === 0 ? ' ⚠️  Live uses 200 bps' : ''}`);

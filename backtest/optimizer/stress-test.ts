@@ -80,8 +80,6 @@ export async function runStressTests(
                 silent: true,
                 volMultiplier: base.volMultiplier ?? 1.0,
                 useChainlinkForFairValue: base.useChainlinkForFairValue ?? false,
-                binanceChainlinkAdjustment: base.binanceChainlinkAdjustment ?? 0,
-                adjustmentMethod: base.adjustmentMethod ?? 'static',
                 adjustmentWindowHours: base.adjustmentWindowHours ?? 2,
                 cooldownMs: base.cooldownMs ?? 60000,
                 maxTradesPerMarket: base.maxTradesPerMarket ?? 3,

@@ -80,7 +80,7 @@ async function runWithAdjustment(
   endDate: Date,
   edge: number,
   spread: number,
-  adjustment: number
+  _adjustment: number
 ): Promise<{ result: BacktestResult; stats: Statistics }> {
   const config: Partial<BacktestConfig> = {
     startDate,
@@ -92,10 +92,9 @@ async function runWithAdjustment(
     maxPositionPerMarket: 1000,
     lagSeconds: 0,
     executionLatencyMs: 0,
-    useChainlinkForFairValue: false,  // Use Binance with adjustment
+    useChainlinkForFairValue: false,  // Uses Binance with EMA adjustment (static sweep is deprecated)
     volMultiplier: 1.0,
     mode: 'normal',
-    binanceChainlinkAdjustment: adjustment,
   };
 
   const simulator = new Simulator(config);
