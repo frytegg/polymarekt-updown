@@ -116,7 +116,7 @@ export { calculatePolymarketFee } from '../core/fees';
 // TRADE PERSISTENCE SERVICE
 // =============================================================================
 
-class TradePersistence {
+export class TradePersistence {
   private trades: PaperTrade[] = [];
   private positions: Map<string, PaperPosition> = new Map();
   private resolutions: ResolutionRecord[] = [];
@@ -135,8 +135,8 @@ class TradePersistence {
   // Passes conditionId + both token IDs so RedemptionService can query CTF balances
   public onRedemptionNeeded?: (conditionId: string, yesTokenId?: string, noTokenId?: string) => void;
 
-  constructor() {
-    this.dataDir = path.join(process.cwd(), 'data', 'paper-trades');
+  constructor(dataDir?: string) {
+    this.dataDir = dataDir ?? path.join(process.cwd(), 'data', 'paper-trades');
     if (!fs.existsSync(this.dataDir)) {
       fs.mkdirSync(this.dataDir, { recursive: true });
     }
@@ -446,127 +446,202 @@ class TradePersistence {
   }
 
   /**
-   * Load from JSON file
+   * Parse a single data file, returning validated trades, positions, and resolutions.
+   * Shared by loadFromFile() and the cross-day orphan recovery scan.
+   */
+  private parseDataFile(filePath: string): {
+    trades: PaperTrade[];
+    positions: PaperPosition[];
+    resolutions: ResolutionRecord[];
+    nextTradeId: number;
+    nextResolutionId: number;
+    skippedTrades: number;
+    skippedPositions: number;
+  } | null {
+    try {
+      if (!fs.existsSync(filePath)) return null;
+
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(raw);
+
+      let skippedTrades = 0;
+      let skippedPositions = 0;
+
+      const trades: PaperTrade[] = (data.trades || [])
+        .map((t: any, index: number) => {
+          if (!t.tokenId || !t.marketId || t.price === undefined || t.size === undefined) {
+            skippedTrades++;
+            return null;
+          }
+
+          const cost = t.cost ?? (t.price * t.size);
+          const fee = t.fee ?? 0;
+          const maxProfit = t.maxProfit ?? ((1 - t.price) * t.size - fee);
+          const maxLoss = t.maxLoss ?? (cost + fee);
+          const id = t.id ?? (index + 1);
+          const resolved = t.resolved ?? false;
+          const marketEndTime = t.marketEndTime ?? 0;
+
+          return {
+            ...t,
+            id,
+            timestamp: new Date(t.timestamp),
+            cost,
+            maxProfit,
+            maxLoss,
+            resolved,
+            marketEndTime,
+          };
+        })
+        .filter((t: PaperTrade | null): t is PaperTrade => t !== null);
+
+      const positions: PaperPosition[] = [];
+      for (const pos of data.positions || []) {
+        if (!pos.tokenId || !pos.marketId || pos.shares === undefined) {
+          skippedPositions++;
+          continue;
+        }
+
+        const positionTradeIds = pos.tradeIds ?? trades
+          .filter((t: PaperTrade) => t.tokenId === pos.tokenId && !t.resolved)
+          .map((t: PaperTrade) => t.id);
+
+        if (positionTradeIds.length === 0) {
+          skippedPositions++;
+          continue;
+        }
+
+        const totalCost = pos.totalCost ?? (pos.avgPrice * pos.shares);
+        const totalFees = pos.totalFees ?? 0;
+        const maxProfit = pos.maxProfit ?? (pos.shares - totalCost - totalFees);
+        const maxLoss = pos.maxLoss ?? (totalCost + totalFees);
+
+        const associatedTrade = trades.find((t: PaperTrade) => t.tokenId === pos.tokenId);
+        const marketEndTime = pos.marketEndTime ?? associatedTrade?.marketEndTime ?? 0;
+        const strike = pos.strike ?? associatedTrade?.strike ?? 0;
+
+        positions.push({
+          tokenId: pos.tokenId,
+          marketId: pos.marketId,
+          side: pos.side,
+          avgPrice: pos.avgPrice,
+          shares: pos.shares,
+          totalCost,
+          totalFees,
+          tradeIds: positionTradeIds,
+          marketEndTime,
+          strike,
+          maxProfit,
+          maxLoss,
+        });
+      }
+
+      const resolutions: ResolutionRecord[] = (data.resolutions || []).map((r: any) => ({
+        ...r,
+        timestamp: new Date(r.timestamp),
+      }));
+
+      const nextTradeId = data.meta?.nextTradeId || trades.length + 1;
+      const nextResolutionId = data.meta?.nextResolutionId || resolutions.length + 1;
+
+      return { trades, positions, resolutions, nextTradeId, nextResolutionId, skippedTrades, skippedPositions };
+    } catch (err: any) {
+      this.log.warn('file.parse_error', { file: path.basename(filePath), error: err.message?.slice(0, 100) });
+      return null;
+    }
+  }
+
+  /**
+   * Load from today's JSON file, then scan older files for orphaned positions
+   * that were never resolved (e.g., bot restarted across midnight boundary).
    */
   private loadFromFile(): void {
     try {
-      if (fs.existsSync(this.logFile)) {
-        const raw = fs.readFileSync(this.logFile, 'utf-8');
-        const data = JSON.parse(raw);
-
-        // Restore trades with validation/migration
-        const now = Date.now();
-        let skippedTrades = 0;
-        let skippedPositions = 0;
-
-        this.trades = (data.trades || [])
-          .map((t: any, index: number) => {
-            // Validate required fields exist
-            if (!t.tokenId || !t.marketId || t.price === undefined || t.size === undefined) {
-              skippedTrades++;
-              return null;
-            }
-
-            // Migrate/calculate missing fields
-            const cost = t.cost ?? (t.price * t.size);
-            const fee = t.fee ?? 0;
-            const maxProfit = t.maxProfit ?? ((1 - t.price) * t.size - fee);
-            const maxLoss = t.maxLoss ?? (cost + fee);
-            const id = t.id ?? (index + 1);
-            const resolved = t.resolved ?? false;
-            const marketEndTime = t.marketEndTime ?? 0;
-
-            return {
-              ...t,
-              id,
-              timestamp: new Date(t.timestamp),
-              cost,
-              maxProfit,
-              maxLoss,
-              resolved,
-              marketEndTime,
-            };
-          })
-          .filter((t: PaperTrade | null): t is PaperTrade => t !== null);
-
-        // Restore positions with validation
+      // Load today's file as the primary data source
+      const parsed = this.parseDataFile(this.logFile);
+      if (parsed) {
+        this.trades = parsed.trades;
         this.positions.clear();
-        for (const pos of data.positions || []) {
-          // Validate required fields
-          if (!pos.tokenId || !pos.marketId || pos.shares === undefined) {
-            skippedPositions++;
-            continue;
-          }
-
-          // Find trade IDs for this position from loaded trades
-          const positionTradeIds = pos.tradeIds ?? this.trades
-            .filter((t: PaperTrade) => t.tokenId === pos.tokenId && !t.resolved)
-            .map((t: PaperTrade) => t.id);
-
-          // Skip positions with no associated trades (stale data)
-          if (positionTradeIds.length === 0) {
-            skippedPositions++;
-            continue;
-          }
-
-          // Migrate/calculate missing fields
-          const totalCost = pos.totalCost ?? (pos.avgPrice * pos.shares);
-          const totalFees = pos.totalFees ?? 0;
-          const maxProfit = pos.maxProfit ?? (pos.shares - totalCost - totalFees);
-          const maxLoss = pos.maxLoss ?? (totalCost + totalFees);
-
-          // Try to get marketEndTime and strike from associated trades
-          const associatedTrade = this.trades.find((t: PaperTrade) => t.tokenId === pos.tokenId);
-          const marketEndTime = pos.marketEndTime ?? associatedTrade?.marketEndTime ?? 0;
-          const strike = pos.strike ?? associatedTrade?.strike ?? 0;
-
-          // Keep expired positions — checkAndResolveExpired() will resolve them properly
-          // (Previously these were dropped on load, orphaning trades as permanently "open")
-          if (marketEndTime > 0 && marketEndTime < now) {
-            this.log.debug('file.expired_position_kept', { marketId: pos.marketId?.slice(0, 12), endedAt: new Date(marketEndTime).toISOString() });
-          }
-
-          this.positions.set(pos.tokenId, {
-            tokenId: pos.tokenId,
-            marketId: pos.marketId,
-            side: pos.side,
-            avgPrice: pos.avgPrice,
-            shares: pos.shares,
-            totalCost,
-            totalFees,
-            tradeIds: positionTradeIds,
-            marketEndTime,
-            strike,
-            maxProfit,
-            maxLoss,
-          });
+        for (const pos of parsed.positions) {
+          this.positions.set(pos.tokenId, pos);
         }
-
-        // Restore resolutions
-        this.resolutions = (data.resolutions || []).map((r: any) => ({
-          ...r,
-          timestamp: new Date(r.timestamp),
-        }));
-
-        // Restore IDs
-        this.nextTradeId = data.meta?.nextTradeId || this.trades.length + 1;
-        this.nextResolutionId = data.meta?.nextResolutionId || this.resolutions.length + 1;
+        this.resolutions = parsed.resolutions;
+        this.nextTradeId = parsed.nextTradeId;
+        this.nextResolutionId = parsed.nextResolutionId;
 
         this.log.info('startup.loaded', {
           trades: this.trades.length,
           positions: this.positions.size,
           resolutions: this.resolutions.length,
-          skippedTrades: skippedTrades > 0 ? skippedTrades : undefined,
-          skippedPositions: skippedPositions > 0 ? skippedPositions : undefined,
+          skippedTrades: parsed.skippedTrades > 0 ? parsed.skippedTrades : undefined,
+          skippedPositions: parsed.skippedPositions > 0 ? parsed.skippedPositions : undefined,
         });
 
-        // Resave if we migrated/cleaned data
-        if (skippedTrades > 0 || skippedPositions > 0) {
+        if (parsed.skippedTrades > 0 || parsed.skippedPositions > 0) {
           this.saveToFile();
         }
       }
+
+      // Scan older files for orphaned unresolved positions (cross-midnight recovery).
+      // Only look back 7 days to avoid scanning ancient history.
+      this.recoverOrphanedPositions();
     } catch (err: any) {
       this.log.error('file.load_error', { error: err.message?.slice(0, 100) });
+    }
+  }
+
+  /**
+   * Scan paper-trades files from previous days for positions that were never
+   * resolved. This handles the critical case where the bot restarts after
+   * midnight: today's file doesn't exist yet, so positions from yesterday
+   * would be silently lost without this recovery.
+   */
+  private recoverOrphanedPositions(): void {
+    try {
+      const todayFile = path.basename(this.logFile);
+      const files = fs.readdirSync(this.dataDir)
+        .filter(f => f.startsWith('paper-trades-') && f.endsWith('.json') && f !== todayFile)
+        .sort()         // Oldest first
+        .slice(-7);     // Only look back 7 days
+
+      let recoveredCount = 0;
+
+      for (const file of files) {
+        const filePath = path.join(this.dataDir, file);
+        const parsed = this.parseDataFile(filePath);
+        if (!parsed) continue;
+
+        for (const pos of parsed.positions) {
+          // Skip if we already have this position (loaded from today's file)
+          if (this.positions.has(pos.tokenId)) continue;
+
+          // This is an orphaned position — bring it into today's working set
+          this.positions.set(pos.tokenId, pos);
+          recoveredCount++;
+
+          // Also recover the associated unresolved trades so resolution bookkeeping works
+          for (const tradeId of pos.tradeIds) {
+            const trade = parsed.trades.find(t => t.id === tradeId && !t.resolved);
+            if (trade && !this.trades.some(t => t.id === trade.id && t.tokenId === trade.tokenId)) {
+              this.trades.push(trade);
+              // Bump nextTradeId past any recovered trade IDs to avoid collisions
+              if (trade.id >= this.nextTradeId) {
+                this.nextTradeId = trade.id + 1;
+              }
+            }
+          }
+        }
+      }
+
+      if (recoveredCount > 0) {
+        this.log.info('startup.recovered_orphans', {
+          recoveredPositions: recoveredCount,
+          totalPositions: this.positions.size,
+        });
+        this.saveToFile();
+      }
+    } catch (err: any) {
+      this.log.warn('startup.orphan_recovery_failed', { error: err.message?.slice(0, 100) });
     }
   }
 
@@ -584,13 +659,20 @@ class TradePersistence {
       this.log.debug('resolution.checking_expired', { count: expired.length });
     }
 
+    // Track processed markets to avoid duplicate resolution when both YES+NO exist
+    const processedMarkets = new Set<string>();
+
     for (const pos of positions) {
       // Only check positions past their expiry + 2 min buffer
       if (pos.marketEndTime <= 0 || pos.marketEndTime + 120_000 > now) continue;
 
+      // Skip if already processed (both YES and NO resolved in one pass)
+      if (processedMarkets.has(pos.marketId)) continue;
+      processedMarkets.add(pos.marketId);
+
       const marketId = pos.marketId.slice(0, 12);
       try {
-        this.log.debug('resolution.fetching_outcome', { marketId, side: pos.side });
+        this.log.debug('resolution.fetching_outcome', { marketId });
         const outcome = await this.fetchMarketOutcome(pos.marketId);
         if (outcome) {
           this.log.info('resolution.market_resolved', { marketId, outcome });

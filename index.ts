@@ -95,7 +95,6 @@ class CryptoPricerArb {
         rpcUrl
       );
       paperTracker.onRedemptionNeeded = (conditionId: string, yesTokenId?: string, noTokenId?: string) => {
-        console.log(`[Redemption] Triggered for ${conditionId.slice(0, 18)}... YES=${yesTokenId?.slice(0, 10)}... NO=${noTokenId?.slice(0, 10)}...`);
         redemptionService.redeemPositions(conditionId, yesTokenId, noTokenId).catch((err: any) => {
           console.log(`[Redemption] Async error: ${err.message?.slice(0, 80)}`);
         });
@@ -105,6 +104,18 @@ class CryptoPricerArb {
       paperTracker.checkAndResolveExpired().catch((err: any) => {
         console.log(`[Redemption] Startup sweep error: ${err.message?.slice(0, 80)}`);
       });
+
+      // Retry any pending redemptions from previous session (persisted queue)
+      redemptionService.retryPending().catch((err: any) => {
+        console.log(`[Redemption] Startup retry error: ${err.message?.slice(0, 80)}`);
+      });
+
+      // Retry pending redemptions every 5 minutes (catches transient RPC/gas failures)
+      setInterval(() => {
+        redemptionService.retryPending().catch((err: any) => {
+          console.log(`[Redemption] Retry sweep error: ${err.message?.slice(0, 80)}`);
+        });
+      }, 5 * 60 * 1000);
     }
 
     // Initialize volatility service (fetches Binance klines + Deribit data, starts refresh loop)

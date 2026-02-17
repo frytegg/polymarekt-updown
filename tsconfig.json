@@ -22,7 +22,9 @@
     "node_modules",
     "dist",
     "backtest/scripts",
-    "mm_example"
+    "mm_example",
+    "tests",
+    "vitest.config.ts"
   ],
   "ts-node": {
     "transpileOnly": true,
